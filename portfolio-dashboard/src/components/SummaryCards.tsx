@@ -39,9 +39,11 @@ export default function SummaryCards({ latest, positions }: Props) {
 
   const cashGbp   = positions.filter(p => p.category === 'Cash').reduce((s, p) => s + p.gbp_value, 0)
   const cashPct   = totalValue > 0 ? (cashGbp / totalValue * 100).toFixed(1) : '0'
+  // Equity cost basis only (excludes cash sitting on the side)
+  const equityInvested = invested - cashGbp
   const totalDiv  = positions.reduce((s, p) => s + Number(p.dividend_return || p.dividend || 0), 0)
   const yieldPct  = totalValue > 0 ? (totalDiv / totalValue * 100).toFixed(2) : '0.00'
-  const investPct = totalValue > 0 ? (invested / totalValue * 100).toFixed(1) : '0'
+  const investPct = totalValue > 0 ? (equityInvested / totalValue * 100).toFixed(1) : '0'
 
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -54,8 +56,8 @@ export default function SummaryCards({ latest, positions }: Props) {
       />
       <Card
         label="Invested"
-        value={fmtGbp(invested)}
-        sub={`${investPct}% deployed`}
+        value={fmtGbp(equityInvested)}
+        sub={`${investPct}% of portfolio`}
         valueClass="text-[var(--text)]"
       />
       <Card
