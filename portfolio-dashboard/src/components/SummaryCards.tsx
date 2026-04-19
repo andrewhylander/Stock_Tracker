@@ -1,62 +1,71 @@
-import type { PortfolioDaily } from '../lib/supabase'
+import type { PortfolioDaily, Position } from '../lib/supabase'
+import { fmtGbp, plClass, plSign } from '../constants'
 
 interface Props {
-  data: PortfolioDaily | null
+  latest: PortfolioDaily | null
+  positions: Position[]
 }
 
-function fmt(n: number, decimals = 2) {
-  return n.toLocaleString('en-GB', { minimumFractionDigits: decimals, maximumFractionDigits: decimals })
-}
-
-interface CardProps {
-  label: string
-  value: string
-  sub?: string
-  positive?: boolean | null
-}
-
-function Card({ label, value, sub, positive }: CardProps) {
-  const subColor =
-    positive === null || positive === undefined
-      ? 'text-gray-400'
-      : positive
-      ? 'text-emerald-400'
-      : 'text-red-400'
-
+function Card({ label, value, sub, valueClass = 'text-[#4f8eff]', subClass = '' }: {
+  label: string; value: string; sub?: string; valueClass?: string; subClass?: string
+}) {
   return (
-    <div className="bg-gray-800 rounded-xl p-5 flex flex-col gap-1">
-      <span className="text-xs uppercase tracking-widest text-gray-400">{label}</span>
-      <span className="text-2xl font-semibold text-white">{value}</span>
-      {sub && <span className={`text-sm font-medium ${subColor}`}>{sub}</span>}
+    <div className="rounded-2xl p-5 border border-[var(--border)] bg-[var(--surface)] hover:border-white/10 transition-colors">
+      <p className="text-[0.65rem] font-semibold uppercase tracking-widest text-[var(--muted)] mb-3">{label}</p>
+      <p className={`text-[1.75rem] font-bold leading-none tracking-tight ${valueClass}`}>{value}</p>
+      {sub && <p className={`text-[0.75rem] mt-2 ${subClass || 'text-[var(--muted)]'}`}>{sub}</p>}
     </div>
   )
 }
 
-export default function SummaryCards({ data }: Props) {
-  if (!data) {
+function Skeleton() {
+  return <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] h-28 animate-pulse" />
+}
+
+export default function SummaryCards({ latest, positions }: Props) {
+  if (!latest) {
     return (
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {[...Array(4)].map((_, i) => (
-          <div key={i} className="bg-gray-800 rounded-xl p-5 h-24 animate-pulse" />
-        ))}
+        {[...Array(4)].map((_, i) => <Skeleton key={i} />)}
       </div>
     )
   }
 
-  const pl = data.total_unrealised_pl
-  const plPct = data.total_unrealised_pl_pct
+  const pl = latest.total_unrealised_pl
+  const plPct = latest.total_unrealised_pl_pct
+  const totalDiv = positions.reduce((s, p) => s + (p.dividend || 0), 0)
+  const yieldPct = latest.total_gbp_value > 0 ? (totalDiv / latest.total_gbp_value * 100).toFixed(2) : '0.00'
+  const investPct = latest.total_gbp_value > 0
+    ? (latest.invested_gbp / latest.total_gbp_value * 100).toFixed(1)
+    : '0'
 
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-      <Card label="Portfolio Value" value={`£${fmt(data.total_gbp_value)}`} />
+      <Card
+        label="Portfolio Value"
+        value={fmtGbp(latest.total_gbp_value)}
+        sub={`${positions.length} positions`}
+        valueClass="text-[#4f8eff]"
+      />
       <Card
         label="Unrealised P&L"
-        value={`${pl >= 0 ? '+' : ''}£${fmt(pl)}`}
-        sub={`${plPct >= 0 ? '+' : ''}${fmt(plPct)}%`}
-        positive={pl >= 0}
+        value={`${plSign(pl)}${fmtGbp(pl)}`}
+        sub={`${plSign(plPct)}${plPct.toFixed(2)}%`}
+        valueClass={plClass(pl)}
+        subClass={plClass(pl)}
       />
-      <Card label="Invested" value={`£${fmt(data.invested_gbp)}`} />
-      <Card label="Last Updated" value={data.snapshot_date} sub="daily at 22:00 UTC" positive={null} />
+      <Card
+        label="Invested"
+        value={fmtGbp(latest.invested_gbp)}
+        sub={`${investPct}% deployed`}
+        valueClass="text-[var(--text)]"
+      />
+      <Card
+        label="Annual Dividends"
+        value={fmtGbp(totalDiv)}
+        sub={`${yieldPct}% portfolio yield`}
+        valueClass="text-[#f5c142]"
+      />
     </div>
   )
 }

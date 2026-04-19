@@ -2,7 +2,10 @@ import { useEffect, useState } from 'react'
 import { supabase } from './lib/supabase'
 import type { PortfolioDaily, Position } from './lib/supabase'
 import SummaryCards from './components/SummaryCards'
+import MoversStrip from './components/MoversStrip'
 import PortfolioChart from './components/PortfolioChart'
+import AllocationChart from './components/AllocationChart'
+import SectorBreakdown from './components/SectorBreakdown'
 import PositionsTable from './components/PositionsTable'
 
 export default function App() {
@@ -25,10 +28,8 @@ export default function App() {
             .select('*')
             .order('gbp_value', { ascending: false }),
         ])
-
         if (histRes.error) throw histRes.error
         if (posRes.error) throw posRes.error
-
         const h = histRes.data ?? []
         setHistory(h)
         setLatest(h.length ? h[h.length - 1] : null)
@@ -42,23 +43,52 @@ export default function App() {
     load()
   }, [])
 
+  const totalValue = latest?.total_gbp_value ?? 0
+
   return (
-    <div className="min-h-screen bg-gray-900 text-white">
+    <div className="min-h-screen" style={{ background: 'var(--bg)', color: 'var(--text)' }}>
       <div className="max-w-7xl mx-auto px-4 py-8 space-y-6">
+
+        {/* Header */}
         <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold">Portfolio Dashboard</h1>
-          {loading && <span className="text-sm text-gray-400 animate-pulse">Loading…</span>}
+          <div>
+            <h1 className="text-[1.6rem] font-bold tracking-tight">Portfolio</h1>
+            <p className="text-[0.75rem] text-[var(--muted)] mt-0.5">
+              {latest ? `Last updated ${latest.snapshot_date}` : 'Loading…'}
+            </p>
+          </div>
+          {loading && (
+            <div className="flex items-center gap-2 text-[0.75rem] text-[var(--muted)]">
+              <span className="live-dot w-2 h-2 rounded-full bg-[var(--green)] inline-block" />
+              Updating…
+            </div>
+          )}
         </div>
 
         {error && (
-          <div className="bg-red-900/40 border border-red-700 rounded-xl p-4 text-red-300 text-sm">
+          <div className="rounded-xl p-4 text-[0.82rem] border" style={{ background: 'rgba(242,107,107,0.08)', borderColor: 'rgba(242,107,107,0.3)', color: '#f26b6b' }}>
             {error}
           </div>
         )}
 
-        <SummaryCards data={latest} />
+        {/* Summary KPI cards */}
+        <SummaryCards latest={latest} positions={positions} />
+
+        {/* Movers strip */}
+        <MoversStrip positions={positions} totalValue={totalValue} />
+
+        {/* Portfolio value chart */}
         <PortfolioChart data={history} />
-        <PositionsTable positions={positions} />
+
+        {/* Allocation donut + top holdings */}
+        <AllocationChart positions={positions} totalValue={totalValue} />
+
+        {/* Sector breakdown */}
+        <SectorBreakdown positions={positions} />
+
+        {/* Positions table */}
+        <PositionsTable positions={positions} totalValue={totalValue} />
+
       </div>
     </div>
   )

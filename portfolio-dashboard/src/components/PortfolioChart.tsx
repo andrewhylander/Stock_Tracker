@@ -24,49 +24,49 @@ function formatGBP(v: number) {
 export default function PortfolioChart({ data }: Props) {
   if (!data.length) {
     return (
-      <div className="bg-gray-800 rounded-xl p-5">
-        <h2 className="text-lg font-semibold text-white mb-4">Portfolio Value Over Time</h2>
-        <div className="h-64 flex items-center justify-center text-gray-500">No data yet</div>
+      <div className="rounded-2xl p-5 border border-[var(--border)] bg-[var(--surface)]">
+        <p className="text-[0.65rem] font-semibold uppercase tracking-widest text-[var(--muted)] mb-4">Portfolio Value</p>
+        <div className="h-64 flex items-center justify-center text-[var(--muted)] text-sm">No data yet</div>
       </div>
     )
   }
 
   return (
-    <div className="bg-gray-800 rounded-xl p-5">
-      <h2 className="text-lg font-semibold text-white mb-4">Portfolio Value Over Time</h2>
-      <ResponsiveContainer width="100%" height={280}>
+    <div className="rounded-2xl p-5 border border-[var(--border)] bg-[var(--surface)]">
+      <p className="text-[0.65rem] font-semibold uppercase tracking-widest text-[var(--muted)] mb-4">Portfolio Value</p>
+      <ResponsiveContainer width="100%" height={260}>
         <AreaChart data={data} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
           <defs>
             <linearGradient id="grad" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3} />
-              <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
+              <stop offset="5%" stopColor="#4f8eff" stopOpacity={0.25} />
+              <stop offset="95%" stopColor="#4f8eff" stopOpacity={0} />
             </linearGradient>
           </defs>
-          <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+          <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
           <XAxis
             dataKey="snapshot_date"
             tickFormatter={formatDate}
-            tick={{ fill: '#9ca3af', fontSize: 12 }}
+            tick={{ fill: '#4e5d74', fontSize: 11 }}
             axisLine={false}
             tickLine={false}
           />
           <YAxis
             tickFormatter={formatGBP}
-            tick={{ fill: '#9ca3af', fontSize: 12 }}
+            tick={{ fill: '#4e5d74', fontSize: 11 }}
             axisLine={false}
             tickLine={false}
             width={80}
           />
           <Tooltip
-            contentStyle={{ backgroundColor: '#1f2937', border: 'none', borderRadius: 8 }}
-            labelStyle={{ color: '#d1d5db' }}
+            contentStyle={{ background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 10, fontSize: 12 }}
+            labelStyle={{ color: 'var(--text)' }}
             formatter={(v: number) => [formatGBP(v), 'Value']}
             labelFormatter={formatDate}
           />
           <Area
             type="monotone"
             dataKey="total_gbp_value"
-            stroke="#6366f1"
+            stroke="#4f8eff"
             strokeWidth={2}
             fill="url(#grad)"
           />

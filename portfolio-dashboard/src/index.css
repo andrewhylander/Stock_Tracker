@@ -1,3 +1,28 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+
+:root {
+  --bg:      #07090f;
+  --surface: #0d1117;
+  --surface2:#131a24;
+  --border:  rgba(255,255,255,0.07);
+  --text:    #e4eaf4;
+  --muted:   #4e5d74;
+  --accent:  #4f8eff;
+  --green:   #1fc48a;
+  --gold:    #f5c142;
+  --red:     #f26b6b;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.25; }
+}
+
+.live-dot { animation: blink 2s ease-in-out infinite; }
