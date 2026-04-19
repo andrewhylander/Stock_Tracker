@@ -14,7 +14,12 @@ interface Props {
 }
 
 function formatDate(d: string) {
-  return new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+  const dt = new Date(d)
+  return dt.toLocaleDateString('en-GB', { month: 'short', year: '2-digit' })
+}
+
+function formatDateLong(d: string) {
+  return new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
 }
 
 function formatGBP(v: number) {
@@ -49,6 +54,7 @@ export default function PortfolioChart({ data }: Props) {
             tick={{ fill: '#4e5d74', fontSize: 11 }}
             axisLine={false}
             tickLine={false}
+            minTickGap={48}
           />
           <YAxis
             tickFormatter={formatGBP}
@@ -61,7 +67,7 @@ export default function PortfolioChart({ data }: Props) {
             contentStyle={{ background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 10, fontSize: 12 }}
             labelStyle={{ color: 'var(--text)' }}
             formatter={(v: number) => [formatGBP(v), 'Value']}
-            labelFormatter={formatDate}
+            labelFormatter={formatDateLong}
           />
           <Area
             type="monotone"
