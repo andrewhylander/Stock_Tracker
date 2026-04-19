@@ -1,5 +1,5 @@
 import type { Position } from '../lib/supabase'
-import { fmtGbp, plClass, plSign } from '../constants'
+import { fmtGbp, plSign } from '../constants'
 
 interface Props { positions: Position[]; totalValue: number }
 
