@@ -43,7 +43,8 @@ export default function App() {
     load()
   }, [])
 
-  const totalValue = latest?.total_gbp_value ?? 0
+  const totalValue = latest?.total_gbp_value
+    ?? positions.reduce((s, p) => s + p.gbp_value, 0)
 
   return (
     <div className="min-h-screen" style={{ background: 'var(--bg)', color: 'var(--text)' }}>
@@ -54,7 +55,9 @@ export default function App() {
           <div>
             <h1 className="text-[1.6rem] font-bold tracking-tight">Portfolio</h1>
             <p className="text-[0.75rem] text-[var(--muted)] mt-0.5">
-              {latest ? `Last updated ${latest.snapshot_date}` : 'Loading…'}
+              {latest
+              ? `Last updated ${latest.snapshot_date}`
+              : loading ? 'Loading…' : `${positions.length} positions loaded`}
             </p>
           </div>
           {loading && (

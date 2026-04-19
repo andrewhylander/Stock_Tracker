@@ -23,7 +23,7 @@ function Skeleton() {
 }
 
 export default function SummaryCards({ latest, positions }: Props) {
-  if (!latest) {
+  if (!latest && !positions.length) {
     return (
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[...Array(4)].map((_, i) => <Skeleton key={i} />)}
@@ -31,19 +31,21 @@ export default function SummaryCards({ latest, positions }: Props) {
     )
   }
 
-  const pl = latest.total_unrealised_pl
-  const plPct = latest.total_unrealised_pl_pct
-  const totalDiv = positions.reduce((s, p) => s + (p.dividend || 0), 0)
-  const yieldPct = latest.total_gbp_value > 0 ? (totalDiv / latest.total_gbp_value * 100).toFixed(2) : '0.00'
-  const investPct = latest.total_gbp_value > 0
-    ? (latest.invested_gbp / latest.total_gbp_value * 100).toFixed(1)
-    : '0'
+  const totalValue   = latest?.total_gbp_value   ?? positions.reduce((s, p) => s + p.gbp_value, 0)
+  const pl           = latest?.total_unrealised_pl ?? positions.reduce((s, p) => s + p.unrealised_pl, 0)
+  const invested     = latest?.invested_gbp        ?? (totalValue - pl)
+  const plPct        = latest?.total_unrealised_pl_pct
+    ?? (invested > 0 ? (pl / invested * 100) : 0)
+
+  const totalDiv  = positions.reduce((s, p) => s + (p.dividend || 0), 0)
+  const yieldPct  = totalValue > 0 ? (totalDiv / totalValue * 100).toFixed(2) : '0.00'
+  const investPct = totalValue > 0 ? (invested / totalValue * 100).toFixed(1) : '0'
 
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
       <Card
         label="Portfolio Value"
-        value={fmtGbp(latest.total_gbp_value)}
+        value={fmtGbp(totalValue)}
         sub={`${positions.length} positions`}
         valueClass="text-[#4f8eff]"
       />
@@ -56,7 +58,7 @@ export default function SummaryCards({ latest, positions }: Props) {
       />
       <Card
         label="Invested"
-        value={fmtGbp(latest.invested_gbp)}
+        value={fmtGbp(invested)}
         sub={`${investPct}% deployed`}
         valueClass="text-[var(--text)]"
       />
