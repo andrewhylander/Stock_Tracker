@@ -77,11 +77,11 @@ export default function App() {
         {/* Summary KPI cards */}
         <SummaryCards latest={latest} positions={positions} />
 
-        {/* Movers strip */}
-        <MoversStrip positions={positions} totalValue={totalValue} />
-
         {/* Portfolio value chart */}
         <PortfolioChart data={history} />
+
+        {/* Movers strip */}
+        <MoversStrip positions={positions} totalValue={totalValue} />
 
         {/* Allocation donut + top holdings */}
         <AllocationChart positions={positions} totalValue={totalValue} />
