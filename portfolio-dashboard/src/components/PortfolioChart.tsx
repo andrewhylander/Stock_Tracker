@@ -38,13 +38,27 @@ export default function PortfolioChart({ data }: Props) {
 
   return (
     <div className="rounded-2xl p-5 border border-[var(--border)] bg-[var(--surface)]">
-      <p className="text-[0.65rem] font-semibold uppercase tracking-widest text-[var(--muted)] mb-4">Portfolio Value</p>
+      <div className="flex items-center justify-between mb-4">
+        <p className="text-[0.65rem] font-semibold uppercase tracking-widest text-[var(--muted)]">Portfolio Value</p>
+        <div className="flex items-center gap-4">
+          <span className="flex items-center gap-1.5 text-[0.7rem] text-[var(--muted)]">
+            <span className="inline-block w-6 h-0.5 bg-[#4f8eff]" />Total + Gains
+          </span>
+          <span className="flex items-center gap-1.5 text-[0.7rem] text-[var(--muted)]">
+            <span className="inline-block w-6 h-0.5 bg-[#f5c142] opacity-70" style={{ borderTop: '2px dashed #f5c142' }} />Invested
+          </span>
+        </div>
+      </div>
       <ResponsiveContainer width="100%" height={260}>
         <AreaChart data={data} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
           <defs>
-            <linearGradient id="grad" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="#4f8eff" stopOpacity={0.25} />
+            <linearGradient id="gradValue" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%" stopColor="#4f8eff" stopOpacity={0.2} />
               <stop offset="95%" stopColor="#4f8eff" stopOpacity={0} />
+            </linearGradient>
+            <linearGradient id="gradInvested" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%" stopColor="#f5c142" stopOpacity={0.08} />
+              <stop offset="95%" stopColor="#f5c142" stopOpacity={0} />
             </linearGradient>
           </defs>
           <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
@@ -65,8 +79,11 @@ export default function PortfolioChart({ data }: Props) {
           />
           <Tooltip
             contentStyle={{ background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 10, fontSize: 12 }}
-            labelStyle={{ color: 'var(--text)' }}
-            formatter={(v: number) => [formatGBP(v), 'Value']}
+            labelStyle={{ color: 'var(--text)', marginBottom: 4 }}
+            formatter={(v: number, name: string) => [
+              formatGBP(v),
+              name === 'total_gbp_value' ? 'Total + Gains' : 'Invested'
+            ]}
             labelFormatter={formatDateLong}
           />
           <Area
@@ -74,7 +91,15 @@ export default function PortfolioChart({ data }: Props) {
             dataKey="total_gbp_value"
             stroke="#4f8eff"
             strokeWidth={2}
-            fill="url(#grad)"
+            fill="url(#gradValue)"
+          />
+          <Area
+            type="monotone"
+            dataKey="invested_gbp"
+            stroke="#f5c142"
+            strokeWidth={1.5}
+            strokeDasharray="5 3"
+            fill="url(#gradInvested)"
           />
         </AreaChart>
       </ResponsiveContainer>
