@@ -37,7 +37,7 @@ export default function SummaryCards({ latest, positions }: Props) {
   const plPct        = latest?.total_unrealised_pl_pct
     ?? (invested > 0 ? (pl / invested * 100) : 0)
 
-  const totalDiv  = positions.reduce((s, p) => s + (p.dividend_return || p.dividend || 0), 0)
+  const totalDiv  = positions.reduce((s, p) => s + Number(p.dividend_return || p.dividend || 0), 0)
   const yieldPct  = totalValue > 0 ? (totalDiv / totalValue * 100).toFixed(2) : '0.00'
   const investPct = totalValue > 0 ? (invested / totalValue * 100).toFixed(1) : '0'
 
