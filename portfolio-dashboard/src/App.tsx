@@ -15,6 +15,24 @@ export default function App() {
   const [benchmark, setBenchmark] = useState<BenchmarkDaily[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [syncing, setSyncing] = useState(false)
+  const [syncStatus, setSyncStatus] = useState<'idle' | 'ok' | 'err'>('idle')
+
+  async function triggerSync() {
+    setSyncing(true)
+    setSyncStatus('idle')
+    try {
+      const res = await fetch(
+        `${import.meta.env.VITE_N8N_URL}/api/v1/workflows/${import.meta.env.VITE_N8N_WORKFLOW_ID}/run`,
+        { method: 'POST', headers: { 'X-N8N-API-KEY': import.meta.env.VITE_N8N_API_KEY } }
+      )
+      setSyncStatus(res.ok ? 'ok' : 'err')
+    } catch {
+      setSyncStatus('err')
+    } finally {
+      setSyncing(false)
+    }
+  }
 
   useEffect(() => {
     async function load() {
@@ -66,12 +84,26 @@ export default function App() {
               : loading ? 'Loading…' : `${positions.length} positions loaded`}
             </p>
           </div>
-          {loading && (
-            <div className="flex items-center gap-2 text-[0.75rem] text-[var(--muted)]">
-              <span className="live-dot w-2 h-2 rounded-full bg-[var(--green)] inline-block" />
-              Updating…
-            </div>
-          )}
+          <div className="flex items-center gap-3">
+            {loading && (
+              <div className="flex items-center gap-2 text-[0.75rem] text-[var(--muted)]">
+                <span className="live-dot w-2 h-2 rounded-full bg-[var(--green)] inline-block" />
+                Updating…
+              </div>
+            )}
+            <button
+              onClick={triggerSync}
+              disabled={syncing}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-[0.75rem] font-semibold border transition-colors ${
+                syncStatus === 'ok'  ? 'border-[var(--green)] text-[var(--green)]' :
+                syncStatus === 'err' ? 'border-[#f26b6b] text-[#f26b6b]' :
+                'border-[var(--border)] text-[var(--muted)] hover:text-[var(--text)] hover:border-white/20'
+              } disabled:opacity-50`}
+            >
+              <span className={syncing ? 'live-dot' : ''}>⟳</span>
+              {syncing ? 'Running…' : syncStatus === 'ok' ? 'Triggered!' : syncStatus === 'err' ? 'Failed' : 'Sync Now'}
+            </button>
+          </div>
         </div>
 
         {error && (
