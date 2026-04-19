@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from './lib/supabase'
-import type { PortfolioDaily, Position } from './lib/supabase'
+import type { PortfolioDaily, Position, BenchmarkDaily } from './lib/supabase'
 import SummaryCards from './components/SummaryCards'
 import MoversStrip from './components/MoversStrip'
 import PortfolioChart from './components/PortfolioChart'
@@ -12,13 +12,14 @@ export default function App() {
   const [history, setHistory] = useState<PortfolioDaily[]>([])
   const [latest, setLatest] = useState<PortfolioDaily | null>(null)
   const [positions, setPositions] = useState<Position[]>([])
+  const [benchmark, setBenchmark] = useState<BenchmarkDaily[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     async function load() {
       try {
-        const [histRes, posRes] = await Promise.all([
+        const [histRes, posRes, bmRes] = await Promise.all([
           supabase
             .from('portfolio_daily')
             .select('*')
@@ -27,6 +28,10 @@ export default function App() {
             .from('latest_position_snapshots')
             .select('*')
             .order('gbp_value', { ascending: false }),
+          supabase
+            .from('benchmark_daily')
+            .select('*')
+            .order('snapshot_date', { ascending: true }),
         ])
         if (histRes.error) throw histRes.error
         if (posRes.error) throw posRes.error
@@ -34,6 +39,7 @@ export default function App() {
         setHistory(h)
         setLatest(h.length ? h[h.length - 1] : null)
         setPositions(posRes.data ?? [])
+        setBenchmark(bmRes.data ?? [])
       } catch (e: unknown) {
         setError(e instanceof Error ? e.message : 'Failed to load data')
       } finally {
@@ -78,7 +84,7 @@ export default function App() {
         <SummaryCards latest={latest} positions={positions} />
 
         {/* Portfolio value chart */}
-        <PortfolioChart data={history} />
+        <PortfolioChart data={history} benchmark={benchmark} />
 
         {/* Movers strip */}
         <MoversStrip positions={positions} totalValue={totalValue} />

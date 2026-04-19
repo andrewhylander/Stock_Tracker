@@ -1,11 +1,11 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useMemo } from 'react'
 import {
   ResponsiveContainer, AreaChart, Area,
   XAxis, YAxis, CartesianGrid, Tooltip,
 } from 'recharts'
-import type { PortfolioDaily } from '../lib/supabase'
+import type { BenchmarkDaily, PortfolioDaily } from '../lib/supabase'
 
-interface Props { data: PortfolioDaily[] }
+interface Props { data: PortfolioDaily[]; benchmark: BenchmarkDaily[] }
 
 const RANGES = ['1M', '3M', '6M', '1Y', 'All'] as const
 type Range = typeof RANGES[number]
@@ -28,36 +28,9 @@ function formatGBP(v: number) {
   return `£${v.toLocaleString('en-GB', { maximumFractionDigits: 0 })}`
 }
 
-export default function PortfolioChart({ data }: Props) {
-  const [range, setRange]             = useState<Range>('All')
+export default function PortfolioChart({ data, benchmark }: Props) {
+  const [range, setRange]                 = useState<Range>('All')
   const [showBenchmark, setShowBenchmark] = useState(false)
-  const [benchmarkRaw, setBenchmarkRaw]  = useState<{ date: string; price: number }[]>([])
-  const [bmLoading, setBmLoading]        = useState(false)
-  const [bmError, setBmError]            = useState(false)
-
-  // Fetch S&P 500 (SPY) monthly candles from Finnhub
-  useEffect(() => {
-    if (!showBenchmark || !data.length) return
-    if (benchmarkRaw.length) return // already fetched
-
-    setBmLoading(true)
-    setBmError(false)
-    const from  = Math.floor(new Date(data[0].snapshot_date).getTime() / 1000)
-    const to    = Math.floor(Date.now() / 1000)
-    const token = import.meta.env.VITE_FINNHUB_TOKEN
-
-    fetch(`https://finnhub.io/api/v1/stock/candle?symbol=SPY&resolution=M&from=${from}&to=${to}&token=${token}`)
-      .then(r => r.json())
-      .then(json => {
-        if (json.s !== 'ok' || !json.t?.length) { setBmError(true); return }
-        setBenchmarkRaw(json.t.map((ts: number, i: number) => ({
-          date:  new Date(ts * 1000).toISOString().slice(0, 7),
-          price: json.c[i] as number,
-        })))
-      })
-      .catch(() => setBmError(true))
-      .finally(() => setBmLoading(false))
-  }, [showBenchmark, data, benchmarkRaw.length])
 
   // Filter portfolio data by range
   const filtered = useMemo(() => {
@@ -67,24 +40,22 @@ export default function PortfolioChart({ data }: Props) {
 
   // Merge benchmark into chart rows (normalised to portfolio starting value)
   const chartData = useMemo(() => {
-    if (!benchmarkRaw.length || !filtered.length) {
+    if (!benchmark.length || !filtered.length) {
       return filtered.map(d => ({ ...d, total_invested_gbp: (d.invested_gbp ?? 0) + (d.cash_gbp ?? 0), benchmark_value: undefined }))
     }
     const firstPortfolioValue = filtered[0].total_gbp_value
-    const firstYm = filtered[0].snapshot_date.slice(0, 7)
-    const firstBm = benchmarkRaw.find(b => b.date >= firstYm) ?? benchmarkRaw[0]
-    const scale = firstPortfolioValue / firstBm.price
+    const firstBm = benchmark.find(b => b.snapshot_date >= filtered[0].snapshot_date) ?? benchmark[0]
+    const scale = firstPortfolioValue / firstBm.price_usd
 
     return filtered.map(d => {
-      const ym = d.snapshot_date.slice(0, 7)
-      const bm = [...benchmarkRaw].reverse().find(b => b.date <= ym)
+      const bm = [...benchmark].reverse().find(b => b.snapshot_date <= d.snapshot_date)
       return {
         ...d,
         total_invested_gbp: (d.invested_gbp ?? 0) + (d.cash_gbp ?? 0),
-        benchmark_value: bm ? bm.price * scale : undefined,
+        benchmark_value: bm ? bm.price_usd * scale : undefined,
       }
     })
-  }, [filtered, benchmarkRaw])
+  }, [filtered, benchmark])
 
   if (!data.length) {
     return (
@@ -119,17 +90,14 @@ export default function PortfolioChart({ data }: Props) {
 
           {/* Benchmark toggle */}
           <button
-            onClick={() => { setShowBenchmark(b => !b); setBmError(false) }}
+            onClick={() => setShowBenchmark(b => !b)}
             className={`px-3 py-1 rounded-full text-[0.72rem] font-semibold border transition-colors ${
-              bmError
-                ? 'border-[#f26b6b] text-[#f26b6b]'
-                : showBenchmark
+              showBenchmark
                 ? 'border-[#a78bfa] text-[#a78bfa]'
                 : 'border-[var(--border)] text-[var(--muted)] hover:text-[var(--text)]'
             }`}
-            title={bmError ? 'Failed to load — check VITE_FINNHUB_TOKEN in .env.local' : ''}
           >
-            {bmLoading ? 'Loading…' : bmError ? 'S&P 500 ✕' : 'S&P 500'}
+            S&amp;P 500
           </button>
 
           {/* Range selector */}

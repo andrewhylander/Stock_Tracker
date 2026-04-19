@@ -14,6 +14,12 @@ export interface PortfolioDaily {
   invested_gbp: number
 }
 
+export interface BenchmarkDaily {
+  snapshot_date: string
+  symbol: string
+  price_usd: number
+}
+
 export interface Position {
   id: number
   snapshot_date: string
