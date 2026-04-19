@@ -15,7 +15,16 @@ export default function AllocationChart({ positions, totalValue }: Props) {
     .map(([name, value]) => ({ name, value }))
     .sort((a, b) => b.value - a.value)
 
-  const top5 = [...positions].sort((a, b) => b.gbp_value - a.gbp_value).slice(0, 5)
+  // Aggregate by ticker across brokerages, then take top 5
+  const byTicker = Object.values(
+    positions.reduce<Record<string, { ticker: string; category: string; gbp_value: number }>>((acc, p) => {
+      if (!acc[p.ticker]) acc[p.ticker] = { ticker: p.ticker, category: p.category || 'Other', gbp_value: 0 }
+      acc[p.ticker].gbp_value += p.gbp_value
+      return acc
+    }, {})
+  ).sort((a, b) => b.gbp_value - a.gbp_value)
+
+  const top5 = byTicker.slice(0, 5)
   const maxVal = top5[0]?.gbp_value ?? 1
 
   return (
@@ -71,9 +80,9 @@ export default function AllocationChart({ positions, totalValue }: Props) {
           {top5.map(p => {
             const pct = totalValue > 0 ? (p.gbp_value / totalValue * 100) : 0
             const barPct = (p.gbp_value / maxVal * 100).toFixed(1)
-            const cat = p.category || 'Other'
+            const cat = p.category
             return (
-              <div key={p.id}>
+              <div key={p.ticker}>
                 <div className="flex items-center justify-between mb-1">
                   <div className="flex items-center gap-2">
                     <span
