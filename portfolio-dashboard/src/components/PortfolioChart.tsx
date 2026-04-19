@@ -27,6 +27,11 @@ function formatGBP(v: number) {
 }
 
 export default function PortfolioChart({ data }: Props) {
+  const chartData = data.map(d => ({
+    ...d,
+    total_invested_gbp: (d.invested_gbp ?? 0) + (d.cash_gbp ?? 0),
+  }))
+
   if (!data.length) {
     return (
       <div className="rounded-2xl p-5 border border-[var(--border)] bg-[var(--surface)]">
@@ -50,7 +55,7 @@ export default function PortfolioChart({ data }: Props) {
         </div>
       </div>
       <ResponsiveContainer width="100%" height={260}>
-        <AreaChart data={data} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+        <AreaChart data={chartData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
           <defs>
             <linearGradient id="gradValue" x1="0" y1="0" x2="0" y2="1">
               <stop offset="5%" stopColor="#4f8eff" stopOpacity={0.2} />
@@ -81,7 +86,7 @@ export default function PortfolioChart({ data }: Props) {
             content={({ active, payload, label }) => {
               if (!active || !payload?.length) return null
               const value    = payload.find(p => p.dataKey === 'total_gbp_value')?.value as number ?? 0
-              const invested = payload.find(p => p.dataKey === 'invested_gbp')?.value as number ?? 0
+              const invested = payload.find(p => p.dataKey === 'total_invested_gbp')?.value as number ?? 0
               const diff     = value - invested
               const diffPos  = diff >= 0
               return (
@@ -105,7 +110,7 @@ export default function PortfolioChart({ data }: Props) {
           />
           <Area
             type="monotone"
-            dataKey="invested_gbp"
+            dataKey="total_invested_gbp"
             stroke="#f5c142"
             strokeWidth={1.5}
             strokeDasharray="5 3"
