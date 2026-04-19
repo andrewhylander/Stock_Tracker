@@ -78,13 +78,23 @@ export default function PortfolioChart({ data }: Props) {
             width={80}
           />
           <Tooltip
-            contentStyle={{ background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 10, fontSize: 12 }}
-            labelStyle={{ color: 'var(--text)', marginBottom: 4 }}
-            formatter={(v: number, name: string) => [
-              formatGBP(v),
-              name === 'total_gbp_value' ? 'Total + Gains' : 'Invested'
-            ]}
-            labelFormatter={formatDateLong}
+            content={({ active, payload, label }) => {
+              if (!active || !payload?.length) return null
+              const value    = payload.find(p => p.dataKey === 'total_gbp_value')?.value as number ?? 0
+              const invested = payload.find(p => p.dataKey === 'invested_gbp')?.value as number ?? 0
+              const diff     = value - invested
+              const diffPos  = diff >= 0
+              return (
+                <div style={{ background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 10, padding: '10px 14px', fontSize: 12 }}>
+                  <p style={{ color: 'var(--text)', marginBottom: 8, fontWeight: 600 }}>{formatDateLong(label)}</p>
+                  <p style={{ color: '#4f8eff', marginBottom: 4 }}>Total + Gains : {formatGBP(value)}</p>
+                  <p style={{ color: '#f5c142', marginBottom: 6 }}>Invested : {formatGBP(invested)}</p>
+                  <p style={{ color: diffPos ? '#1fc48a' : '#f26b6b', borderTop: '1px solid var(--border)', paddingTop: 6, fontWeight: 600 }}>
+                    {diffPos ? '+' : ''}{formatGBP(diff)} unrealised
+                  </p>
+                </div>
+              )
+            }}
           />
           <Area
             type="monotone"
