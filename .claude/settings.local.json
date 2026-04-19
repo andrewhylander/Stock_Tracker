@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__n8n-mcp__n8n_create_workflow",
+      "mcp__n8n-mcp__n8n_validate_workflow",
+      "mcp__n8n-mcp__get_node",
+      "mcp__n8n-mcp__n8n_update_partial_workflow",
+      "mcp__n8n-mcp__n8n_get_workflow",
+      "Bash(python3 -c ' *)",
+      "Bash(node -e ' *)",
+      "mcp__n8n-mcp__n8n_delete_workflow",
+      "mcp__n8n-mcp__n8n_executions",
+      "mcp__n8n-mcp__n8n_manage_credentials",
+      "WebFetch(domain:finnhub.io)",
+      "WebSearch"
+    ]
+  }
+}

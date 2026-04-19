@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "n8n-mcp": {
+      "command": "npx",
+      "args": ["n8n-mcp"],
+      "env": {
+        "MCP_MODE": "stdio",
+        "LOG_LEVEL": "error",
+        "DISABLE_CONSOLE_OUTPUT": "true",
+        "N8N_API_URL": "https://n8n-qskb.srv1442377.hstgr.cloud",
+        "N8N_API_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhNDk0Y2Y0My05NDJkLTQ4OGMtYmMzNy1iNTMwY2M5NmM0ZjIiLCJpc3MiOiJuOG4iLCJhdWQiOiJwdWJsaWMtYXBpIiwianRpIjoiYzAwZmZiZDQtNDY2MC00NGViLWIxODQtZDA5OWVlOWNiMzg1IiwiaWF0IjoxNzcyMzcyNzYyLCJleHAiOjE3Nzc1MDM2MDB9.1V2B2BNLquMJU7bZ4zu9SMpSyL9xP5JwJqHEaWRNTrY"
+      }
+    }
+  }
+}

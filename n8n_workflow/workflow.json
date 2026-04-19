@@ -1,0 +1,212 @@
+{
+  "name": "Daily Portfolio Snapshot",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": "0 22 * * *",
+        "timezone": "Europe/London"
+      },
+      "id": "schedule-trigger",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "operation": "readRows",
+        "documentId": "1D0T_-CIeb11IAGG0UazDPzLqOp5rrujJPwVNZn_KWT4",
+        "sheetName": "n8n_export",
+        "range": "A:Z",
+        "options": {
+          "firstRowContainsHeaders": true,
+          "readAllRows": true
+        }
+      },
+      "id": "google-sheets",
+      "name": "Google Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 3,
+      "position": [460, 300],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "your-credential-id",
+          "name": "Google Sheets OAuth2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javascript",
+        "jsCode": "const allRows = $input.all();\nconst uniqueTickers = [...new Set(\n  allRows\n    .map(row => row.json.Ticker)\n    .filter(ticker => ticker && !ticker.includes('CASH'))\n)];\n\nreturn uniqueTickers.map(ticker => ({ ticker }));\n"
+      },
+      "id": "code-deduplicate",
+      "name": "Code: Deduplicate Tickers",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 3,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://api.twelvedata.com/exchange_rate?symbol=GBP/USD&apikey={{$credentials.twelveDataApiKey}}",
+        "sendBody": false,
+        "responseFormat": "json"
+      },
+      "id": "http-fx",
+      "name": "HTTP Request: FX Rate",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [900, 180]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://api.twelvedata.com/price?symbol={{$node[\"Code\"].json.ticker.join(',')}}&apikey={{$credentials.twelveDataApiKey}}",
+        "sendBody": false,
+        "responseFormat": "json"
+      },
+      "id": "http-prices",
+      "name": "HTTP Request: Prices",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [900, 420]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javascript",
+        "jsCode": "const originalRows = $node[\"Google Sheets\"].all();\nconst fxRate = $node[\"HTTP Request\"].json.rate;\nconst prices = $node[\"HTTP Request1\"].json;\n\nconst processedRows = originalRows.map(row => {\n  const ticker = row.json.Ticker;\n  const currency = row.json.Currency;\n  const sharePrice = parseFloat(row.json['Share Price']);\n  const shareCount = parseFloat(row.json['Share Count']);\n  const avgCost = parseFloat(row.json['Avg Cost']);\n  const gbpValueSheet = parseFloat(row.json.GBP) || 0;\n  \n  let livePrice = prices[ticker]?.price ? parseFloat(prices[ticker].price) : sharePrice;\n  let gbpValue = gbpValueSheet;\n  \n  if (currency === 'USD') {\n    livePrice = livePrice * fxRate;\n    gbpValue = livePrice * shareCount;\n  } else {\n    gbpValue = livePrice * shareCount;\n  }\n  \n  const invested = avgCost * shareCount;\n  const unrealisedPl = gbpValue - invested;\n  const unrealisedPlPct = invested > 0 ? (unrealisedPl / invested) * 100 : 0;\n  \n  return {\n    snapshot_date: new Date().toISOString().split('T')[0],\n    brokerage: row.json.Brokerage,\n    exchange: row.json.Exchange,\n    ticker: ticker,\n    category: row.json.Category,\n    sector: row.json.Sector,\n    region: row.json.Region,\n    currency: currency,\n    share_price: livePrice,\n    share_count: shareCount,\n    gbp_value: gbpValue,\n    avg_cost: avgCost,\n    fx_rate: fxRate,\n    unrealised_pl: unrealisedPl,\n    unrealised_pl_pct: unrealisedPlPct,\n    dividend: parseFloat(row.json.Dividend) || 0,\n    dividend_pct: parseFloat(row.json['Dividend %']) || 0,\n    dividend_return: parseFloat(row.json['Dividend Return']) || 0\n  };\n});\n\nreturn processedRows;\n"
+      },
+      "id": "code-process",
+      "name": "Code: Process Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 3,
+      "position": [1120, 300]
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "table": "position_snapshots",
+        "columns": "snapshot_date,brokerage,exchange,ticker,category,sector,region,currency,share_price,share_count,gbp_value,avg_cost,fx_rate,unrealised_pl,unrealised_pl_pct,dividend,dividend_pct,dividend_return"
+      },
+      "id": "supabase-positions",
+      "name": "Supabase: Positions",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [1340, 300],
+      "credentials": {
+        "supabaseApi": {
+          "id": "your-supabase-id",
+          "name": "Supabase API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "table": "portfolio_daily",
+        "columns": "snapshot_date,total_gbp_value,total_unrealised_pl,total_unrealised_pl_pct,cash_gbp,invested_gbp"
+      },
+      "id": "supabase-daily",
+      "name": "Supabase: Daily Summary",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [1560, 300],
+      "credentials": {
+        "supabaseApi": {
+          "id": "your-supabase-id",
+          "name": "Supabase API"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Google Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Sheets": {
+      "main": [
+        [
+          {
+            "node": "Code: Deduplicate Tickers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code: Deduplicate Tickers": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request: FX Rate",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "HTTP Request: Prices",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request: FX Rate": {
+      "main": [
+        [
+          {
+            "node": "Code: Process Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request: Prices": {
+      "main": [
+        [
+          {
+            "node": "Code: Process Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code: Process Data": {
+      "main": [
+        [
+          {
+            "node": "Supabase: Positions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase: Positions": {
+      "main": [
+        [
+          {
+            "node": "Supabase: Daily Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {},
+  "staticData": null
+}
