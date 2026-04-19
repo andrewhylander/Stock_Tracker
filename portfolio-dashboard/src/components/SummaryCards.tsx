@@ -37,6 +37,8 @@ export default function SummaryCards({ latest, positions }: Props) {
   const plPct        = latest?.total_unrealised_pl_pct
     ?? (invested > 0 ? (pl / invested * 100) : 0)
 
+  const cashGbp   = positions.filter(p => p.category === 'Cash').reduce((s, p) => s + p.gbp_value, 0)
+  const cashPct   = totalValue > 0 ? (cashGbp / totalValue * 100).toFixed(1) : '0'
   const totalDiv  = positions.reduce((s, p) => s + Number(p.dividend_return || p.dividend || 0), 0)
   const yieldPct  = totalValue > 0 ? (totalDiv / totalValue * 100).toFixed(2) : '0.00'
   const investPct = totalValue > 0 ? (invested / totalValue * 100).toFixed(1) : '0'
@@ -44,16 +46,10 @@ export default function SummaryCards({ latest, positions }: Props) {
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
       <Card
-        label="Portfolio Value"
+        label="Total Value"
         value={fmtGbp(totalValue)}
-        sub={`${positions.length} positions`}
+        sub={`${plSign(pl)}${fmtGbp(pl)} (${plSign(plPct)}${plPct.toFixed(1)}%)`}
         valueClass="text-[#4f8eff]"
-      />
-      <Card
-        label="Unrealised P&L"
-        value={`${plSign(pl)}${fmtGbp(pl)}`}
-        sub={`${plSign(plPct)}${plPct.toFixed(2)}%`}
-        valueClass={plClass(pl)}
         subClass={plClass(pl)}
       />
       <Card
@@ -63,9 +59,15 @@ export default function SummaryCards({ latest, positions }: Props) {
         valueClass="text-[var(--text)]"
       />
       <Card
+        label="Cash Held"
+        value={fmtGbp(cashGbp)}
+        sub={`${cashPct}% of portfolio`}
+        valueClass="text-[#1fc48a]"
+      />
+      <Card
         label="Annual Dividends"
         value={fmtGbp(totalDiv)}
-        sub={`${yieldPct}% portfolio yield`}
+        sub={`${yieldPct}% yield`}
         valueClass="text-[#f5c142]"
       />
     </div>
