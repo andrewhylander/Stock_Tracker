@@ -33,6 +33,7 @@ export default function PortfolioChart({ data }: Props) {
   const [showBenchmark, setShowBenchmark] = useState(false)
   const [benchmarkRaw, setBenchmarkRaw]  = useState<{ date: string; price: number }[]>([])
   const [bmLoading, setBmLoading]        = useState(false)
+  const [bmError, setBmError]            = useState(false)
 
   // Fetch S&P 500 (SPY) monthly candles from Finnhub
   useEffect(() => {
@@ -40,20 +41,21 @@ export default function PortfolioChart({ data }: Props) {
     if (benchmarkRaw.length) return // already fetched
 
     setBmLoading(true)
-    const from = Math.floor(new Date(data[0].snapshot_date).getTime() / 1000)
-    const to   = Math.floor(Date.now() / 1000)
+    setBmError(false)
+    const from  = Math.floor(new Date(data[0].snapshot_date).getTime() / 1000)
+    const to    = Math.floor(Date.now() / 1000)
     const token = import.meta.env.VITE_FINNHUB_TOKEN
 
     fetch(`https://finnhub.io/api/v1/stock/candle?symbol=SPY&resolution=M&from=${from}&to=${to}&token=${token}`)
       .then(r => r.json())
       .then(json => {
-        if (json.s !== 'ok' || !json.t?.length) return
+        if (json.s !== 'ok' || !json.t?.length) { setBmError(true); return }
         setBenchmarkRaw(json.t.map((ts: number, i: number) => ({
-          date:  new Date(ts * 1000).toISOString().slice(0, 7), // "2024-01"
+          date:  new Date(ts * 1000).toISOString().slice(0, 7),
           price: json.c[i] as number,
         })))
       })
-      .catch(() => {})
+      .catch(() => setBmError(true))
       .finally(() => setBmLoading(false))
   }, [showBenchmark, data, benchmarkRaw.length])
 
@@ -117,14 +119,17 @@ export default function PortfolioChart({ data }: Props) {
 
           {/* Benchmark toggle */}
           <button
-            onClick={() => setShowBenchmark(b => !b)}
+            onClick={() => { setShowBenchmark(b => !b); setBmError(false) }}
             className={`px-3 py-1 rounded-full text-[0.72rem] font-semibold border transition-colors ${
-              showBenchmark
+              bmError
+                ? 'border-[#f26b6b] text-[#f26b6b]'
+                : showBenchmark
                 ? 'border-[#a78bfa] text-[#a78bfa]'
                 : 'border-[var(--border)] text-[var(--muted)] hover:text-[var(--text)]'
             }`}
+            title={bmError ? 'Failed to load — check VITE_FINNHUB_TOKEN in .env.local' : ''}
           >
-            {bmLoading ? 'Loading…' : 'S&P 500'}
+            {bmLoading ? 'Loading…' : bmError ? 'S&P 500 ✕' : 'S&P 500'}
           </button>
 
           {/* Range selector */}
