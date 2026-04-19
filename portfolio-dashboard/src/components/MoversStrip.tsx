@@ -6,10 +6,10 @@ interface Props { positions: Position[]; totalValue: number }
 export default function MoversStrip({ positions, totalValue }: Props) {
   if (!positions.length) return null
 
-  const ranked = [...positions].filter(p => p.unrealised_pl_pct != null)
+  const ranked = [...positions].filter(p => p.unrealised_pl_pct != null && p.category !== 'Cash')
   const best  = [...ranked].sort((a, b) => b.unrealised_pl_pct - a.unrealised_pl_pct)[0]
   const worst = [...ranked].sort((a, b) => a.unrealised_pl_pct - b.unrealised_pl_pct)[0]
-  const top   = [...positions].sort((a, b) => b.gbp_value - a.gbp_value)[0]
+  const top   = [...positions].filter(p => p.category !== 'Cash').sort((a, b) => b.gbp_value - a.gbp_value)[0]
 
   if (!best || !worst || !top) return null
 
