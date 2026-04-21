@@ -22,11 +22,11 @@ export default function App() {
     setSyncing(true)
     setSyncStatus('idle')
     try {
-      const res = await fetch(
+      await fetch(
         `${import.meta.env.VITE_N8N_URL}/webhook/${import.meta.env.VITE_N8N_WEBHOOK_ID}`,
-        { method: 'POST' }
+        { method: 'POST', mode: 'no-cors' }
       )
-      setSyncStatus(res.ok ? 'ok' : 'err')
+      setSyncStatus('ok')
     } catch {
       setSyncStatus('err')
     } finally {
