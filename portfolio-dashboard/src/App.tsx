@@ -23,8 +23,8 @@ export default function App() {
     setSyncStatus('idle')
     try {
       const res = await fetch(
-        `${import.meta.env.VITE_N8N_URL}/api/v1/workflows/${import.meta.env.VITE_N8N_WORKFLOW_ID}/run`,
-        { method: 'POST', headers: { 'X-N8N-API-KEY': import.meta.env.VITE_N8N_API_KEY } }
+        `${import.meta.env.VITE_N8N_URL}/webhook/${import.meta.env.VITE_N8N_WEBHOOK_ID}`,
+        { method: 'POST' }
       )
       setSyncStatus(res.ok ? 'ok' : 'err')
     } catch {
