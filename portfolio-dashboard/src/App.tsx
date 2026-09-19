@@ -8,6 +8,10 @@ import AllocationChart from './components/AllocationChart'
 import SectorBreakdown from './components/SectorBreakdown'
 import PositionsTable from './components/PositionsTable'
 
+function missingViteEnv(names: string[]) {
+  return names.filter((name) => !import.meta.env[name])
+}
+
 export default function App() {
   const [history, setHistory] = useState<PortfolioDaily[]>([])
   const [latest, setLatest] = useState<PortfolioDaily | null>(null)
@@ -17,18 +21,40 @@ export default function App() {
   const [error, setError] = useState<string | null>(null)
   const [syncing, setSyncing] = useState(false)
   const [syncStatus, setSyncStatus] = useState<'idle' | 'ok' | 'err'>('idle')
+  const [syncMessage, setSyncMessage] = useState<string | null>(null)
 
   async function triggerSync() {
+    const missing = missingViteEnv(['VITE_N8N_URL', 'VITE_N8N_WEBHOOK_ID'])
+    if (missing.length) {
+      setSyncStatus('err')
+      setSyncMessage(
+        `Sync is not configured. Set ${missing.join(' and ')} in Vercel Environment Variables, then redeploy.`
+      )
+      return
+    }
+
+    const base = String(import.meta.env.VITE_N8N_URL).replace(/\/$/, '')
+    const id = String(import.meta.env.VITE_N8N_WEBHOOK_ID)
+    const url = `${base}/webhook/${id}`
+
     setSyncing(true)
     setSyncStatus('idle')
+    setSyncMessage(null)
     try {
-      await fetch(
-        `${import.meta.env.VITE_N8N_URL}/webhook/${import.meta.env.VITE_N8N_WEBHOOK_ID}`,
-        { method: 'POST', mode: 'no-cors' }
-      )
+      // Avoid no-cors: opaque responses always look like success and hid /undefined/webhook bugs.
+      const res = await fetch(url, { method: 'POST' })
+      if (!res.ok) {
+        throw new Error(`Sync webhook returned ${res.status}`)
+      }
       setSyncStatus('ok')
-    } catch {
+      setSyncMessage('Sync triggered. Refresh in a minute if positions are still empty.')
+    } catch (e: unknown) {
       setSyncStatus('err')
+      const msg = e instanceof Error ? e.message : 'Sync failed'
+      // CORS failures often surface as TypeError: Failed to fetch even when n8n received the POST.
+      setSyncMessage(
+        `${msg}. If this is a CORS error, enable CORS on the n8n webhook or call Sync from n8n’s schedule instead.`
+      )
     } finally {
       setSyncing(false)
     }
@@ -36,6 +62,15 @@ export default function App() {
 
   useEffect(() => {
     async function load() {
+      const missing = missingViteEnv(['VITE_SUPABASE_URL', 'VITE_SUPABASE_ANON_KEY'])
+      if (missing.length) {
+        setError(
+          `Missing ${missing.join(' and ')}. Add them in Vercel → Settings → Environment Variables, then redeploy (Vite bakes these in at build time).`
+        )
+        setLoading(false)
+        return
+      }
+
       try {
         const [histRes, posRes, bmRes] = await Promise.all([
           supabase
@@ -53,6 +88,7 @@ export default function App() {
         ])
         if (histRes.error) throw histRes.error
         if (posRes.error) throw posRes.error
+        if (bmRes.error) throw bmRes.error
         const h = histRes.data ?? []
         setHistory(h)
         setLatest(h.length ? h[h.length - 1] : null)
@@ -109,6 +145,19 @@ export default function App() {
         {error && (
           <div className="rounded-xl p-4 text-[0.82rem] border" style={{ background: 'rgba(242,107,107,0.08)', borderColor: 'rgba(242,107,107,0.3)', color: '#f26b6b' }}>
             {error}
+          </div>
+        )}
+
+        {syncMessage && (
+          <div
+            className="rounded-xl p-4 text-[0.82rem] border"
+            style={
+              syncStatus === 'ok'
+                ? { background: 'rgba(31,196,138,0.08)', borderColor: 'rgba(31,196,138,0.3)', color: '#1fc48a' }
+                : { background: 'rgba(242,107,107,0.08)', borderColor: 'rgba(242,107,107,0.3)', color: '#f26b6b' }
+            }
+          >
+            {syncMessage}
           </div>
         )}
 
