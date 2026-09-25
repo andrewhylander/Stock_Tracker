@@ -41,11 +41,16 @@ CREATE TABLE portfolio_daily (
 -- Create index on snapshot_date
 CREATE INDEX idx_portfolio_daily_snapshot_date ON portfolio_daily (snapshot_date);
 
--- Create a view for the latest snapshot per ticker
-CREATE VIEW latest_position_snapshots AS
-SELECT DISTINCT ON (ticker) *
+-- Create a view for the most recent snapshot.
+-- This deliberately returns every row from the latest snapshot_date rather than
+-- the newest row per ticker: a portfolio snapshot is a set of holdings on a
+-- date, so a position that leaves the sheet must leave the dashboard too.
+-- (DISTINCT ON (ticker, brokerage) kept sold positions alive indefinitely --
+-- eight rows from 2026-05-08 were still inflating totals in Sep 2026.)
+CREATE OR REPLACE VIEW latest_position_snapshots AS
+SELECT *
 FROM position_snapshots
-ORDER BY ticker, snapshot_date DESC;
+WHERE snapshot_date = (SELECT MAX(snapshot_date) FROM position_snapshots);
 
 -- Create a view for total portfolio value by date
 CREATE VIEW portfolio_value_over_time AS
