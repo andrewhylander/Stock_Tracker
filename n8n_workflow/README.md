@@ -28,16 +28,17 @@ The export is sanitised, and the workflow is imported **inactive**.
 | Placeholder | Where | Replace with |
 |---|---|---|
 | `YOUR_GOOGLE_SHEET_ID` | Google Sheets node | ID of your holdings sheet |
-| `YOUR_TOKEN_HERE` | HTTP: Finnhub Quote (`token` query param) | your Finnhub API key |
 | `YOUR_PROJECT_REF` | both Upsert nodes (URL) | your Supabase project ref |
 | `REPLACE_WITH_A_RANDOM_PATH` | Webhook node (path) | a long random string, e.g. a UUID |
 
-The webhook is unauthenticated, so keep its path secret and do not commit it. Also
-prefer moving the Finnhub key into an n8n credential rather than leaving it in the node.
+The webhook is unauthenticated, so keep its path secret and do not commit it.
 
 ## Credentials to create
 
 - **Google Sheets** - a Google Sheets OAuth2 credential.
+- **Finnhub** - a **Query Auth** credential (`httpQueryAuth`) named `Finnhub API`, with
+  name `token` and your Finnhub API key as the value. The workflow's Finnhub node uses it,
+  so the key is never stored in the workflow itself.
 - **Supabase** - a **Custom Auth** credential (`httpCustomAuth`) containing both headers
   Supabase needs, using the project's `service_role` key:
 

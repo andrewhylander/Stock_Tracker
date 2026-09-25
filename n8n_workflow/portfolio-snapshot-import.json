@@ -209,14 +209,12 @@
             {
               "name": "symbol",
               "value": "={{ $json.symbol }}"
-            },
-            {
-              "name": "token",
-              "value": "YOUR_TOKEN_HERE"
             }
           ]
         },
-        "options": {}
+        "options": {},
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth"
       },
       "id": "http-finnhub",
       "name": "HTTP: Finnhub Quote",
@@ -225,7 +223,13 @@
       "position": [
         912,
         304
-      ]
+      ],
+      "credentials": {
+        "httpQueryAuth": {
+          "id": "sUtG3luAPiivob8C",
+          "name": "Finnhub API"
+        }
+      }
     },
     {
       "parameters": {
