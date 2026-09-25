@@ -1,0 +1,5 @@
+# Local secrets and machine-specific config - never commit these
+.mcp.json
+.env
+.env.*
+!.env.example
