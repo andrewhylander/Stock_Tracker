@@ -26,6 +26,13 @@ export interface BenchmarkDaily {
   price_usd: number
 }
 
+export interface SnapshotRow {
+  ticker: string
+  category: string
+  gbp_value: number
+  unrealised_pl: number
+}
+
 export interface Position {
   id: number
   snapshot_date: string
