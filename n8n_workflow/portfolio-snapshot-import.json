@@ -3,117 +3,284 @@
   "nodes": [
     {
       "parameters": {
-        "rule": "0 22 * * *",
-        "timezone": "Europe/London"
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 22
+            }
+          ]
+        }
       },
       "id": "schedule-trigger",
       "name": "Schedule Trigger",
       "type": "n8n-nodes-base.scheduleTrigger",
-      "typeVersion": 1,
-      "position": [240, 300]
+      "typeVersion": 1.3,
+      "position": [
+        240,
+        304
+      ]
     },
     {
       "parameters": {
-        "operation": "readRows",
-        "documentId": "1D0T_-CIeb11IAGG0UazDPzLqOp5rrujJPwVNZn_KWT4",
-        "sheetName": "n8n_export",
-        "range": "A:Z",
-        "options": {
-          "firstRowContainsHeaders": true,
-          "readAllRows": true
-        }
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "n8n",
+          "mode": "name"
+        },
+        "options": {}
       },
       "id": "google-sheets",
       "name": "Google Sheets",
       "type": "n8n-nodes-base.googleSheets",
-      "typeVersion": 3,
-      "position": [460, 300]
+      "typeVersion": 4.7,
+      "position": [
+        464,
+        304
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "zWnVv1YxezHDREUG",
+          "name": "Google Sheets account"
+        }
+      }
     },
     {
       "parameters": {
-        "mode": "runOnceForAllItems",
-        "language": "javascript",
-        "jsCode": "const allRows = $input.all();\nconst uniqueTickers = [...new Set(\n  allRows\n    .map(row => row.json.Ticker)\n    .filter(ticker => ticker && !ticker.includes('CASH'))\n)];\n\nreturn uniqueTickers.map(ticker => ({ ticker }));\n"
+        "jsCode": "const CRYPTO = new Set(['ETH','XRP','SUI','BTC','SOL','ADA','DOGE']);\nconst SKIP   = ['CASH','OPTIONS','OPTION'];\n\n// LSE stocks not on Finnhub free tier — null means fall back to Google Sheets price in Process Data\nfunction finnhubSym(ticker, currency, exchange) {\n  const t = ticker.trim().toUpperCase();\n  if (CRYPTO.has(t)) return null;\n  if (exchange === 'LON' || exchange === 'LSE' || currency === 'GBX') return null;\n  return t;\n}\n\nconst symbols = [...new Set(\n  $input.all()\n    .filter(r => {\n      const t = (r.json.Ticker || '').toUpperCase();\n      return t && !SKIP.some(s => t.includes(s));\n    })\n    .map(r => finnhubSym(r.json.Ticker || '', r.json.Currency || '', r.json.Exchange || ''))\n    .filter(Boolean)\n)];\n\n// One item per symbol — HTTP: Finnhub Quote runs once per item\nreturn symbols.map(sym => ({ json: { symbol: sym } }));"
       },
-      "id": "code-deduplicate",
-      "name": "Code: Deduplicate Tickers",
+      "id": "code-build-symbols",
+      "name": "Code: Build Symbols",
       "type": "n8n-nodes-base.code",
-      "typeVersion": 3,
-      "position": [680, 300]
+      "typeVersion": 2,
+      "position": [
+        688,
+        304
+      ]
     },
     {
       "parameters": {
-        "method": "GET",
-        "url": "https://api.twelvedata.com/exchange_rate?symbol=GBP/USD&apikey={{$credentials.twelveDataApiKey}}",
-        "sendBody": false,
-        "responseFormat": "json"
+        "jsCode": "// Zip symbol names (from Code: Build Symbols) with Finnhub quote responses\nconst symbolItems = $('Code: Build Symbols').all();\nconst quoteItems  = $input.all();\n\nconst allPrices = {};\nfor (let i = 0; i < symbolItems.length; i++) {\n  const sym   = symbolItems[i]?.json?.symbol;\n  const quote = quoteItems[i]?.json;\n  if (!sym || !quote) continue;\n  const price = quote.c || quote.pc; // current price, fallback to previous close\n  if (price) allPrices[sym] = { price: String(price) };\n}\n\nreturn [{ json: allPrices }];"
+      },
+      "id": "code-merge-prices",
+      "name": "Code: Merge Prices",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1136,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://api.frankfurter.app/latest",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "from",
+              "value": "GBP"
+            },
+            {
+              "name": "to",
+              "value": "USD"
+            }
+          ]
+        },
+        "options": {}
       },
       "id": "http-fx",
-      "name": "HTTP Request: FX Rate",
+      "name": "HTTP: FX Rate",
       "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 3,
-      "position": [900, 180]
+      "typeVersion": 4.4,
+      "position": [
+        1360,
+        304
+      ]
     },
     {
       "parameters": {
-        "method": "GET",
-        "url": "https://api.twelvedata.com/price?symbol={{$node[\"Code: Deduplicate Tickers\"].json.ticker.join(',')}}&apikey={{$credentials.twelveDataApiKey}}",
-        "sendBody": false,
-        "responseFormat": "json"
+        "url": "https://api.coingecko.com/api/v3/simple/price",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "ids",
+              "value": "bitcoin,ethereum,ripple,sui"
+            },
+            {
+              "name": "vs_currencies",
+              "value": "gbp"
+            },
+            {
+              "name": "include_24hr_change",
+              "value": "true"
+            }
+          ]
+        },
+        "options": {}
       },
-      "id": "http-prices",
-      "name": "HTTP Request: Prices",
+      "id": "http-coingecko",
+      "name": "HTTP: CoinGecko Crypto",
       "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 3,
-      "position": [900, 420]
+      "typeVersion": 4.4,
+      "position": [
+        1584,
+        304
+      ]
     },
     {
       "parameters": {
-        "mode": "runOnceForAllItems",
-        "language": "javascript",
-        "jsCode": "const originalRows = $node[\"Google Sheets\"].all();\nconst fxRate = $node[\"HTTP Request: FX Rate\"].json.rate;\nconst prices = $node[\"HTTP Request: Prices\"].json;\n\nconst processedRows = originalRows.map(row => {\n  const ticker = row.json.Ticker;\n  const currency = row.json.Currency;\n  const sharePrice = parseFloat(row.json['Share Price']) || 0;\n  const shareCount = parseFloat(row.json['Share Count']) || 0;\n  const avgCost = parseFloat(row.json['Avg Cost']) || 0;\n  const gbpValueSheet = parseFloat(row.json.GBP) || 0;\n  \n  let livePrice = sharePrice;\n  if (prices && prices[ticker] && prices[ticker].price) {\n    livePrice = parseFloat(prices[ticker].price);\n  }\n  \n  let gbpValue = gbpValueSheet;\n  if (currency === 'USD' && fxRate) {\n    livePrice = livePrice * fxRate;\n    gbpValue = livePrice * shareCount;\n  } else {\n    gbpValue = livePrice * shareCount;\n  }\n  \n  const invested = avgCost * shareCount;\n  const unrealisedPl = gbpValue - invested;\n  const unrealisedPlPct = invested > 0 ? (unrealisedPl / invested) * 100 : 0;\n  \n  return {\n    snapshot_date: new Date().toISOString().split('T')[0],\n    brokerage: row.json.Brokerage || '',\n    exchange: row.json.Exchange || '',\n    ticker: ticker,\n    category: row.json.Category || '',\n    sector: row.json.Sector || '',\n    region: row.json.Region || '',\n    currency: currency,\n    share_price: livePrice,\n    share_count: shareCount,\n    gbp_value: gbpValue,\n    avg_cost: avgCost,\n    fx_rate: fxRate || 1,\n    unrealised_pl: unrealisedPl,\n    unrealised_pl_pct: unrealisedPlPct,\n    dividend: parseFloat(row.json.Dividend) || 0,\n    dividend_pct: parseFloat(row.json['Dividend %']) || 0,\n    dividend_return: parseFloat(row.json['Dividend Return']) || 0\n  };\n});\n\nreturn processedRows;\n"
+        "jsCode": "const allRows  = $('Google Sheets').all();\nconst priceData = $('Code: Merge Prices').first().json;\nconst fxData    = $('HTTP: FX Rate').first().json;\nconst cgData    = $input.first().json;\nconst sheetRate = $('Google Sheets').first().json['ExcRate'];\nconst gbpUsd    = (sheetRate > 0) ? sheetRate : (fxData.rates?.USD || 1.27);\nconst today     = new Date().toISOString().split('T')[0];\n\n// Sheet cells carry stray trailing spaces ('Growth ' vs 'Growth'), which split\n// categories into duplicate slices downstream. Normalise every text field.\nconst clean = v => String(v ?? '').trim();\n\n// Price map from Finnhub — plain US tickers\nconst priceMap = {};\nfor (const [sym, data] of Object.entries(priceData || {})) {\n  if (data?.price) priceMap[sym] = parseFloat(data.price);\n}\n\n// CoinGecko map: ticker -> GBP price\nconst CG_IDS = { BTC:'bitcoin', ETH:'ethereum', XRP:'ripple', SUI:'sui', SOL:'solana' };\nconst cgMap  = {};\nfor (const [ticker, id] of Object.entries(CG_IDS)) {\n  if (cgData[id]) cgMap[ticker] = cgData[id].gbp;\n}\n\nconst CRYPTO = new Set(Object.keys(CG_IDS));\n\nfunction finnhubSym(ticker, currency, exchange) {\n  const t = ticker.trim().toUpperCase();\n  if (CRYPTO.has(t)) return null;\n  if (exchange === 'LON' || exchange === 'LSE' || currency === 'GBX') return null;\n  return t;\n}\n\nreturn allRows\n  .filter(r => !!clean(r.json.Ticker))\n  .map(r => {\n    const ticker     = clean(r.json.Ticker);\n    const currency   = clean(r.json.Currency) || 'GBP';\n    const exchange   = clean(r.json.Exchange);\n    const brokerage  = clean(r.json.Brokerage);\n    const shareCount = parseFloat(String(r.json['Share Count'] || '0').replace(/,/g, '')) || 0;\n    const avgCostRaw = parseFloat(String(r.json['Avg Cost']    || '0').replace(/[£$,]/g, '')) || 0;\n    const sheetGbp   = parseFloat(String(r.json['GBP']         || '0').replace(/[£$,]/g, '')) || 0;\n    const t          = ticker.toUpperCase();\n    const isCash     = t === 'CASH';\n    const isOption   = t.includes('OPTION');\n\n    let gbpPrice  = 0;\n    let gbpValue  = 0;\n    let taxFactor = 1;  // net-of-tax haircut implied by the sheet (e.g. KNOS scheme shares at 0.58)\n\n    if (isCash || isOption) {\n      gbpValue = sheetGbp;\n    } else if (CRYPTO.has(t) && cgMap[t] != null) {\n      gbpPrice = cgMap[t];\n      gbpValue = shareCount > 0 ? gbpPrice * shareCount : sheetGbp;\n    } else {\n      const sym = finnhubSym(ticker, currency, exchange);\n      const raw = sym != null ? priceMap[sym] : null;\n      if (raw != null) {\n        gbpPrice = currency === 'USD' ? raw / gbpUsd : raw;\n        gbpValue = shareCount > 0 ? gbpPrice * shareCount : sheetGbp;\n      } else {\n        // No live price — this is every LSE ticker. The sheet's GBP column is a\n        // live GOOGLEFINANCE formula that already applies any tax haircut, so\n        // trust it instead of recomputing, and reuse the implied factor below\n        // so the cost basis stays on the same net-of-tax footing.\n        const sheetPrice = parseFloat(String(r.json['Share Price'] || '0').replace(/[£$,]/g, '')) || 0;\n        if (currency === 'USD')      gbpPrice = sheetPrice / gbpUsd;\n        else if (currency === 'GBX') gbpPrice = sheetPrice / 100;\n        else                         gbpPrice = sheetPrice;\n\n        const gross = gbpPrice * shareCount;\n        if (sheetGbp > 0 && gross > 0) {\n          gbpValue = sheetGbp;\n          const implied = sheetGbp / gross;\n          // Only a clear reduction counts as a deliberate haircut; anything near\n          // 1 is rounding or a momentarily stale cell, not a tax adjustment.\n          if (implied < 0.95) taxFactor = implied;\n        } else {\n          gbpValue = gross > 0 ? gross : sheetGbp;\n        }\n      }\n    }\n\n    let avgCostGbp;\n    if (currency === 'GBX')      avgCostGbp = avgCostRaw / 100;\n    else if (currency === 'USD') avgCostGbp = avgCostRaw / gbpUsd;\n    else                         avgCostGbp = avgCostRaw;\n    avgCostGbp *= taxFactor;\n\n    const invested        = (isCash || isOption) ? 0 : avgCostGbp * shareCount;\n    const unrealisedPl    = (isCash || isOption) ? 0 : gbpValue - invested;\n    const unrealisedPlPct = (!isCash && !isOption && invested > 0) ? (unrealisedPl / invested) * 100 : 0;\n\n    return { json: {\n      snapshot_date:        today,\n      brokerage,\n      exchange,\n      ticker,\n      category:             clean(r.json.Category),\n      sector:               clean(r.json.Sector),\n      region:               clean(r.json.Region),\n      currency,\n      share_price:          gbpPrice,\n      share_count:          shareCount,\n      gbp_value:            gbpValue,\n      avg_cost:             avgCostGbp,\n      fx_rate:              gbpUsd,\n      unrealised_pl:        unrealisedPl,\n      unrealised_pl_pct:    unrealisedPlPct,\n      dividend:             parseFloat(String(r.json.Dividend           || '0').replace(/[£$,]/g, '')) || 0,\n      dividend_pct:         parseFloat(String(r.json['Dividend %']      || '0').replace(/[£$,]/g, '')) || 0,\n      dividend_return:      parseFloat(String(r.json['Dividend Return'] || '0').replace(/[£$,]/g, '')) || 0\n    }};\n  });"
       },
       "id": "code-process",
       "name": "Code: Process Data",
       "type": "n8n-nodes-base.code",
-      "typeVersion": 3,
-      "position": [1120, 300]
+      "typeVersion": 2,
+      "position": [
+        1808,
+        304
+      ]
     },
     {
       "parameters": {
-        "operation": "insert",
-        "table": "position_snapshots",
-        "columns": "snapshot_date,brokerage,exchange,ticker,category,sector,region,currency,share_price,share_count,gbp_value,avg_cost,fx_rate,unrealised_pl,unrealised_pl_pct,dividend,dividend_pct,dividend_return"
+        "method": "POST",
+        "url": "https://YOUR_PROJECT_REF.supabase.co/rest/v1/position_snapshots?on_conflict=snapshot_date,ticker,brokerage",
+        "authentication": "genericCredentialType",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Prefer",
+              "value": "resolution=merge-duplicates,return=representation"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify($json) }}",
+        "options": {},
+        "genericAuthType": "httpCustomAuth"
       },
       "id": "supabase-positions",
-      "name": "Supabase: Positions",
-      "type": "n8n-nodes-base.supabase",
-      "typeVersion": 1,
-      "position": [1340, 300]
+      "name": "HTTP: Upsert Positions",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2032,
+        192
+      ],
+      "credentials": {
+        "httpCustomAuth": {
+          "id": "pjhN8bkMUnHr6L41",
+          "name": "Supabase Stock Tracker (custom auth)"
+        }
+      }
     },
     {
       "parameters": {
-        "mode": "runOnceForAllItems",
-        "language": "javascript",
-        "jsCode": "const positions = $node[\"Supabase: Positions\"].all();\nconst cashRows = positions.filter(p => p.json.ticker && p.json.ticker.includes('CASH'));\nconst investedRows = positions.filter(p => !p.json.ticker || !p.json.ticker.includes('CASH'));\n\nconst cashGbp = cashRows.reduce((sum, p) => sum + (parseFloat(p.json.gbp_value) || 0), 0);\nconst investedGbp = investedRows.reduce((sum, p) => sum + (parseFloat(p.json.gbp_value) || 0), 0);\nconst totalUnrealisedPl = investedRows.reduce((sum, p) => sum + (parseFloat(p.json.unrealised_pl) || 0), 0);\nconst totalGbpValue = cashGbp + investedGbp;\nconst totalUnrealisedPlPct = investedGbp > 0 ? (totalUnrealisedPl / investedGbp) * 100 : 0;\n\nreturn [{\n  snapshot_date: new Date().toISOString().split('T')[0],\n  total_gbp_value: totalGbpValue,\n  total_unrealised_pl: totalUnrealisedPl,\n  total_unrealised_pl_pct: totalUnrealisedPlPct,\n  cash_gbp: cashGbp,\n  invested_gbp: investedGbp\n}];\n"
+        "jsCode": "const rows  = $input.all();\nconst today = rows[0]?.json.snapshot_date || new Date().toISOString().split('T')[0];\n\nlet totalGbpValue = 0, totalUnrealisedPl = 0, totalInvested = 0, cashGbp = 0;\nfor (const r of rows) {\n  totalGbpValue     += r.json.gbp_value     || 0;\n  totalUnrealisedPl += r.json.unrealised_pl || 0;\n  if (r.json.category === 'Cash') {\n    cashGbp += r.json.gbp_value || 0;\n  } else {\n    totalInvested += (r.json.avg_cost || 0) * (r.json.share_count || 0);\n  }\n}\nconst unrealisedPlPct = totalInvested > 0 ? (totalUnrealisedPl / totalInvested) * 100 : 0;\n\nreturn [{ json: {\n  snapshot_date:           today,\n  total_gbp_value:         totalGbpValue,\n  total_unrealised_pl:     totalUnrealisedPl,\n  total_unrealised_pl_pct: unrealisedPlPct,\n  cash_gbp:                cashGbp,\n  invested_gbp:            totalInvested\n} }];"
       },
-      "id": "code-portfolio",
-      "name": "Code: Portfolio Summary",
+      "id": "code-daily-summary",
+      "name": "Code: Daily Summary",
       "type": "n8n-nodes-base.code",
-      "typeVersion": 3,
-      "position": [1540, 300]
+      "typeVersion": 2,
+      "position": [
+        2032,
+        432
+      ]
     },
     {
       "parameters": {
-        "operation": "insert",
-        "table": "portfolio_daily",
-        "columns": "snapshot_date,total_gbp_value,total_unrealised_pl,total_unrealised_pl_pct,cash_gbp,invested_gbp"
+        "url": "https://finnhub.io/api/v1/quote",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "symbol",
+              "value": "={{ $json.symbol }}"
+            },
+            {
+              "name": "token",
+              "value": "YOUR_TOKEN_HERE"
+            }
+          ]
+        },
+        "options": {}
       },
-      "id": "supabase-daily",
-      "name": "Supabase: Daily Summary",
-      "type": "n8n-nodes-base.supabase",
-      "typeVersion": 1,
-      "position": [1760, 300]
+      "id": "http-finnhub",
+      "name": "HTTP: Finnhub Quote",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        912,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://YOUR_PROJECT_REF.supabase.co/rest/v1/portfolio_daily?on_conflict=snapshot_date",
+        "authentication": "genericCredentialType",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Prefer",
+              "value": "resolution=merge-duplicates,return=representation"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify([$json]) }}",
+        "options": {},
+        "genericAuthType": "httpCustomAuth"
+      },
+      "id": "http-upsert-daily",
+      "name": "HTTP: Upsert Daily",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2240,
+        432
+      ],
+      "credentials": {
+        "httpCustomAuth": {
+          "id": "pjhN8bkMUnHr6L41",
+          "name": "Supabase Stock Tracker (custom auth)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "REPLACE_WITH_A_RANDOM_PATH",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        240,
+        496
+      ],
+      "id": "02de8922-6cd7-4cf0-ac6a-9c8291a81915",
+      "name": "Webhook"
     }
   ],
   "connections": {
@@ -132,41 +299,47 @@
       "main": [
         [
           {
-            "node": "Code: Deduplicate Tickers",
+            "node": "Code: Build Symbols",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Code: Deduplicate Tickers": {
+    "Code: Build Symbols": {
       "main": [
         [
           {
-            "node": "HTTP Request: FX Rate",
-            "type": "main",
-            "index": 0
-          },
-          {
-            "node": "HTTP Request: Prices",
+            "node": "HTTP: Finnhub Quote",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "HTTP Request: FX Rate": {
+    "Code: Merge Prices": {
       "main": [
         [
           {
-            "node": "Code: Process Data",
+            "node": "HTTP: FX Rate",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "HTTP Request: Prices": {
+    "HTTP: FX Rate": {
+      "main": [
+        [
+          {
+            "node": "HTTP: CoinGecko Crypto",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP: CoinGecko Crypto": {
       "main": [
         [
           {
@@ -181,29 +354,45 @@
       "main": [
         [
           {
-            "node": "Supabase: Positions",
+            "node": "HTTP: Upsert Positions",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Code: Daily Summary",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Supabase: Positions": {
+    "HTTP: Finnhub Quote": {
       "main": [
         [
           {
-            "node": "Code: Portfolio Summary",
+            "node": "Code: Merge Prices",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Code: Portfolio Summary": {
+    "Code: Daily Summary": {
       "main": [
         [
           {
-            "node": "Supabase: Daily Summary",
+            "node": "HTTP: Upsert Daily",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Google Sheets",
             "type": "main",
             "index": 0
           }
@@ -212,6 +401,7 @@
     }
   },
   "active": false,
-  "settings": {},
-  "staticData": null
+  "settings": {
+    "executionOrder": "v1"
+  }
 }
