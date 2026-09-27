@@ -12,8 +12,10 @@ export interface Holding {
   ticker: string
   category: string
   shares: number
-  value: number
-  costBasis: number
+  value: number        // as stored -- may be tax/scheme adjusted below market
+  marketValue: number  // share_price x share_count, always gross
+  costBasis: number    // gross, with any scheme adjustment reversed
+  adjusted: boolean    // true where the stored value is below gross market
 }
 
 export interface HoldingDividend extends Holding {
@@ -43,21 +45,50 @@ function toISO(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
-/** One row per ticker, summed across brokerages. */
+/**
+ * One row per ticker, summed across brokerages.
+ *
+ * Holdings under a tax or share scheme are stored net: the snapshot keeps a
+ * fraction of `share_price x share_count` and scales `avg_cost` by the same
+ * fraction. Dividends, though, are paid on every share held. Dividing gross
+ * income by a net value inflates the yield by the reciprocal of that fraction
+ * -- for KNOS, held at 0.58 of market, it read 4.02% against a true 2.33%.
+ *
+ * So yields are computed against gross figures throughout: market value, and a
+ * cost basis with the same adjustment reversed. The stored net value is kept as
+ * `value` for anything that needs to reconcile with the Overview tab.
+ */
 export function holdingsByTicker(positions: Position[]): Map<string, Holding> {
   const map = new Map<string, Holding>()
   for (const p of positions) {
     if (p.category === 'Cash') continue
+
     const h = map.get(p.ticker) ?? {
       ticker: p.ticker,
       category: p.category || 'Other',
       shares: 0,
       value: 0,
+      marketValue: 0,
       costBasis: 0,
+      adjusted: false,
     }
-    h.shares    += Number(p.share_count) || 0
-    h.value     += Number(p.gbp_value) || 0
-    h.costBasis += (Number(p.avg_cost) || 0) * (Number(p.share_count) || 0)
+
+    const shares = Number(p.share_count) || 0
+    const stored = Number(p.gbp_value) || 0
+    const market = (Number(p.share_price) || 0) * shares
+    const cost   = (Number(p.avg_cost) || 0) * shares
+
+    // Below 0.99 rather than 1.0: FX and rounding leave small gaps on holdings
+    // carrying no scheme adjustment at all.
+    const ratio = market > 0 && stored > 0 ? stored / market : 1
+    const isAdjusted = ratio < 0.99
+
+    h.shares      += shares
+    h.value       += stored
+    h.marketValue += market > 0 ? market : stored
+    h.costBasis   += isAdjusted ? cost / ratio : cost
+    h.adjusted     = h.adjusted || isAdjusted
+
     map.set(p.ticker, h)
   }
   return map
@@ -170,7 +201,7 @@ export function buildHoldingDividends(
       ...h,
       perShareAnnual,
       annualIncome,
-      yieldPct:       h.value > 0 ? (annualIncome / h.value) * 100 : 0,
+      yieldPct:       h.marketValue > 0 ? (annualIncome / h.marketValue) * 100 : 0,
       yieldOnCostPct: h.costBasis > 0 ? (annualIncome / h.costBasis) * 100 : 0,
       quarters,
       payments: all,

@@ -5,8 +5,9 @@ interface Props { rows: HoldingDividend[] }
 
 export default function DividendHeader({ rows }: Props) {
   const annual    = rows.reduce((s, r) => s + r.annualIncome, 0)
-  const value     = rows.reduce((s, r) => s + r.value, 0)
+  const value     = rows.reduce((s, r) => s + r.marketValue, 0)
   const costBasis = rows.reduce((s, r) => s + r.costBasis, 0)
+  const anyAdjusted = rows.some((r) => r.adjusted && r.annualIncome > 0)
 
   const yieldPct = value > 0 ? (annual / value) * 100 : 0
   const yocPct   = costBasis > 0 ? (annual / costBasis) * 100 : 0
@@ -30,6 +31,10 @@ export default function DividendHeader({ rows }: Props) {
       <p className="text-[0.7rem] text-[var(--muted)] mt-5 pt-4 border-t border-[var(--border)]">
         Each holding at its current declared rate where it pays a steady one, otherwise its
         last twelve months. Valued at the shares you hold today.
+        {anyAdjusted && (
+          <> Yields are against full market value, so scheme-held shares stay comparable
+          with the rest — these will not tie back to the Overview total.</>
+        )}
       </p>
     </div>
   )
