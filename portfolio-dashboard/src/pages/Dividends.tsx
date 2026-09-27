@@ -1,7 +1,13 @@
 import { useMemo } from 'react'
 import type { DividendPayment, Position } from '../lib/supabase'
-import { buildHoldingDividends, holdingsByTicker, projectPayments } from '../lib/dividends'
+import {
+  buildHoldingDividends,
+  holdingsByTicker,
+  projectPayments,
+  upcomingPayments,
+} from '../lib/dividends'
 import DividendHeader from '../components/DividendHeader'
+import UpcomingDividends from '../components/UpcomingDividends'
 import DividendChart from '../components/DividendChart'
 import DividendTable from '../components/DividendTable'
 
@@ -21,6 +27,16 @@ export default function Dividends({ positions, payments, paymentsError }: Props)
     [payments],
   )
 
+  const upcoming = useMemo(
+    () => upcomingPayments(withProjection, holdings),
+    [withProjection, holdings],
+  )
+
+  const categoryFor = useMemo(() => {
+    const map = new Map(rows.map((r) => [r.ticker, r.category]))
+    return (ticker: string) => map.get(ticker) ?? 'Other'
+  }, [rows])
+
   return (
     <div className="space-y-6">
       {paymentsError && (
@@ -33,6 +49,7 @@ export default function Dividends({ positions, payments, paymentsError }: Props)
       )}
 
       <DividendHeader rows={rows} />
+      <UpcomingDividends upcoming={upcoming} categoryFor={categoryFor} />
       <DividendChart payments={withProjection} holdings={holdings} />
       <DividendTable rows={rows} />
     </div>

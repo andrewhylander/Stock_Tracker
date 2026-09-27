@@ -174,6 +174,74 @@ export function isProjected(p: DividendPayment): boolean {
   return p.source === 'projected'
 }
 
+export interface UpcomingPayment {
+  ticker: string
+  exDate: string
+  amount: number          // GBP, at today's share count
+  perShare: number        // GBP
+  projected: boolean
+  changePct: number | null  // against the same holding's previous payment
+}
+
+/**
+ * The next payments due, soonest first. Dated by ex-dividend date like
+ * everything else here, so a card saying the 30th means the shares go
+ * ex-dividend that day, not that cash arrives.
+ */
+export function upcomingPayments(
+  payments: DividendPayment[],
+  holdings: Map<string, Holding>,
+  limit = 6,
+  today = new Date(),
+): UpcomingPayment[] {
+  const byTicker = groupByTicker(payments)
+  const out: UpcomingPayment[] = []
+
+  for (const [ticker, list] of byTicker) {
+    const shares = holdings.get(ticker)?.shares ?? 0
+    if (!shares) continue
+
+    const sorted = list.slice().sort((a, b) => a.ex_date.localeCompare(b.ex_date))
+    const future = sorted.filter(p => parseDate(p.ex_date) > today)
+    const past = sorted.filter(p => parseDate(p.ex_date) <= today)
+
+    for (const p of future) {
+      const perShare = Number(p.amount_per_share_gbp || 0)
+      const when = parseDate(p.ex_date)
+
+      // Compare against the payment nearest a year earlier, not simply the
+      // previous one. KNOS alternates a large October payment with a smaller
+      // November one, so comparing consecutive payments reported a 95% rise
+      // every year where the rate had not moved at all.
+      const target = new Date(when.getFullYear() - 1, when.getMonth(), when.getDate()).getTime()
+      let prior: DividendPayment | null = null
+      let bestGap = Infinity
+      for (const q of past) {
+        const gap = Math.abs(parseDate(q.ex_date).getTime() - target)
+        if (gap < bestGap) { bestGap = gap; prior = q }
+      }
+
+      // Only meaningful if that match really is about a year back; within ten
+      // weeks either side covers a shifting ex-date without pairing unrelated
+      // payments on a holding with a short history.
+      const comparable = prior && bestGap <= 70 * 86_400_000
+        ? Number(prior.amount_per_share_gbp || 0)
+        : 0
+
+      out.push({
+        ticker,
+        exDate: p.ex_date,
+        amount: perShare * shares,
+        perShare,
+        projected: isProjected(p),
+        changePct: comparable > 0 ? ((perShare - comparable) / comparable) * 100 : null,
+      })
+    }
+  }
+
+  return out.sort((a, b) => a.exDate.localeCompare(b.exDate)).slice(0, limit)
+}
+
 /** Per-holding dividend summary, trailing 12 months. */
 export function buildHoldingDividends(
   positions: Position[],

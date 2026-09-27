@@ -92,14 +92,21 @@ export default function DividendTable({ rows }: Props) {
                   </td>
 
                   <td className="px-3 py-3">
-                    <div className="flex items-center justify-center gap-1">
+                    <div className="flex items-end justify-center gap-1.5">
                       {r.quarters.map((paid, i) => (
-                        <span
-                          key={i}
-                          title={`${QUARTERS[i]}${paid ? '' : ' — no payment'}`}
-                          className="w-1.5 h-4 rounded-sm"
-                          style={{ background: paid ? 'var(--gold)' : 'rgba(255,255,255,0.07)' }}
-                        />
+                        <div key={i} className="flex flex-col items-center gap-1">
+                          <span
+                            title={`${QUARTERS[i]}${paid ? '' : ' — no payment'}`}
+                            className="w-2.5 rounded-sm transition-colors"
+                            style={{
+                              height: paid ? '1.15rem' : '0.5rem',
+                              background: paid ? 'var(--gold)' : 'rgba(255,255,255,0.08)',
+                            }}
+                          />
+                          <span className="text-[0.55rem] text-[var(--muted)] leading-none">
+                            {QUARTERS[i]}
+                          </span>
+                        </div>
                       ))}
                     </div>
                   </td>

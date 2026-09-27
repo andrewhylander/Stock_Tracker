@@ -59,16 +59,29 @@ export default function DividendChart({ payments, holdings }: Props) {
 
       {hasAny ? (
         <>
-          <ResponsiveContainer width="100%" height={260}>
+          <ResponsiveContainer width="100%" height={300}>
             <ComposedChart data={data} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
               <XAxis dataKey="label" tick={{ fill: '#4e5d74', fontSize: 11 }} axisLine={false} tickLine={false} />
+              {/* Separate scales. Sharing one axis let the cumulative total,
+                  an order of magnitude larger than any single month, stretch
+                  the range so the bars sat squashed along the bottom. */}
               <YAxis
+                yAxisId="month"
                 tickFormatter={v => (v ? fmtGbpShort(v) : '£0')}
                 tick={{ fill: '#4e5d74', fontSize: 11 }}
                 axisLine={false}
                 tickLine={false}
                 width={64}
+              />
+              <YAxis
+                yAxisId="cumulative"
+                orientation="right"
+                tickFormatter={v => (v ? fmtGbpShort(v) : '')}
+                tick={{ fill: '#8a6d2f', fontSize: 10 }}
+                axisLine={false}
+                tickLine={false}
+                width={52}
               />
               <Tooltip
                 cursor={{ fill: 'rgba(255,255,255,0.03)' }}
@@ -88,7 +101,7 @@ export default function DividendChart({ payments, holdings }: Props) {
                   )
                 }}
               />
-              <Bar dataKey="total" radius={[4, 4, 0, 0]} maxBarSize={38}>
+              <Bar yAxisId="month" dataKey="total" radius={[5, 5, 0, 0]} maxBarSize={52}>
                 {data.map((d, i) => (
                   // A month that is wholly projected reads as an outline; a
                   // part-projected month stays solid rather than lying either way.
@@ -101,6 +114,7 @@ export default function DividendChart({ payments, holdings }: Props) {
                 ))}
               </Bar>
               <Line
+                yAxisId="cumulative"
                 type="monotone"
                 dataKey="cumulative"
                 stroke="#8a6d2f"
