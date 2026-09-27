@@ -56,8 +56,9 @@ never writes back to it. Prices are the only thing fetched live.
   `/api/dividends` serverless route, **not** by n8n. Upserted on `(ticker, ex_date)`.
 - `lse_price_cache` — one row per LSE ticker, always overwritten (a cache, not a
   history). Written by the `/api/prices` serverless route, **not** by n8n, on a
-  Vercel cron every 6 hours. n8n's `Code: Process Data` reads it and prefers it over
-  the sheet's own `GOOGLEFINANCE`-backed price cell — see below.
+  Vercel cron once daily (Hobby plan caps crons at once per day). n8n's
+  `Code: Process Data` reads it and prefers it over the sheet's own
+  `GOOGLEFINANCE`-backed price cell — see below.
 
 **`benchmark_daily`** — the S&P 500 comparison on the Overview chart reads this
 table. It's now in `supabase_schema.sql`, so a fresh project will have it, but
