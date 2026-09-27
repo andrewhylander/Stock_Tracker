@@ -18,7 +18,7 @@ export default function DividendHeader({ rows }: Props) {
         <p className="text-[2.5rem] font-bold leading-none tracking-tight text-[var(--gold)]">
           {fmtGbp(annual)}
         </p>
-        <p className="text-[0.8rem] text-[var(--muted)]">Annual dividends</p>
+        <p className="text-[0.8rem] text-[var(--muted)]">Annual dividends (forward rate)</p>
       </div>
 
       <div className="flex items-center gap-8 mt-5 flex-wrap">
