@@ -215,8 +215,13 @@ export function cumulative(buckets: MonthBucket[]): number[] {
   return buckets.map(b => (run += b.total))
 }
 
-export function yearsCovered(payments: DividendPayment[]): number[] {
+/**
+ * Years to offer as tabs, newest first. Capped because a long-standing payer
+ * drags the list back a decade or more -- NVDA alone reaches 2012 -- and a row
+ * of sixteen buttons is noise, not navigation.
+ */
+export function yearsCovered(payments: DividendPayment[], limit = 6): number[] {
   const years = new Set<number>()
   for (const p of payments) years.add(parseDate(p.ex_date).getFullYear())
-  return Array.from(years).sort((a, b) => b - a)
+  return Array.from(years).sort((a, b) => b - a).slice(0, limit)
 }

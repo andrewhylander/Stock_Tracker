@@ -48,12 +48,18 @@ function toGbp(amount: number, currency: string, usdPerGbp: number): number {
   }
 }
 
-function isLse(ticker: string): boolean {
-  return /\.(LSE|L)$/i.test(ticker)
+// Route on the exchange column, not the ticker. The sheet stores bare tickers
+// ("VWRL", "KNOS") with exchange "LON"; only the display name elsewhere carries
+// a .LSE suffix. Matching on the suffix sent both London holdings to Alpha
+// Vantage, which has no LSE dividend data and returns an empty array rather
+// than an error -- so they silently contributed nothing.
+function isLse(ticker: string, exchange: string): boolean {
+  return /^(LON|LSE)$/i.test(exchange ?? '') || /\.(LSE|L)$/i.test(ticker)
 }
 
 function yahooSymbol(ticker: string): string {
-  return ticker.replace(/\.LSE$/i, '.L')
+  const base = ticker.replace(/\.(LSE|L)$/i, '')
+  return `${base}.L`
 }
 
 async function fetchYahoo(ticker: string, usdPerGbp: number): Promise<Payment[]> {
@@ -162,19 +168,19 @@ export default async function handler(req: any, res: any) {
   try {
     const { data: positions, error: posErr } = await supabase
       .from('latest_position_snapshots')
-      .select('ticker, category, dividend_pct')
+      .select('ticker, exchange, category')
     if (posErr) throw posErr
 
     // Crypto, cash and options never pay a dividend; asking about them would
     // just burn Alpha Vantage's daily quota.
     const skip = new Set(['Cash', 'Crypto', 'Options'])
-    const tickers = Array.from(
-      new Set(
-        (positions ?? [])
-          .filter((p: any) => p.ticker && !skip.has(p.category))
-          .map((p: any) => String(p.ticker).trim()),
-      ),
-    )
+    const byTickerName = new Map<string, string>() // ticker -> exchange
+    for (const p of positions ?? []) {
+      const ticker = String((p as any).ticker ?? '').trim()
+      if (!ticker || skip.has((p as any).category)) continue
+      if (!byTickerName.has(ticker)) byTickerName.set(ticker, String((p as any).exchange ?? '').trim())
+    }
+    const tickers = Array.from(byTickerName.keys())
 
     const { data: existing, error: exErr } = await supabase
       .from('dividend_payments')
@@ -208,7 +214,7 @@ export default async function handler(req: any, res: any) {
     for (const ticker of due) {
       try {
         let payments: Payment[]
-        if (isLse(ticker)) {
+        if (isLse(ticker, byTickerName.get(ticker) ?? '')) {
           payments = await fetchYahoo(ticker, usdPerGbp)
         } else {
           if (!avKey) throw new Error('ALPHAVANTAGE_API_KEY is not set')
