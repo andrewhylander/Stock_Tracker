@@ -272,14 +272,18 @@ export interface UpcomingPayment {
 }
 
 /**
- * The next payments due, soonest first. Dated by ex-dividend date like
- * everything else here, so a card saying the 30th means the shares go
- * ex-dividend that day, not that cash arrives.
+ * The next payments due, soonest first, dated by pay date where one is known
+ * (falling back to ex-date otherwise -- see effectiveDate).
+ *
+ * Capped well above what is normally due at once (21 were known at time of
+ * writing: a projection horizon of about a year across six holdings). The
+ * card strip already scrolls, so the cap exists to stop this growing without
+ * bound as more history accumulates, not to hide anything currently known.
  */
 export function upcomingPayments(
   payments: DividendPayment[],
   holdings: Map<string, Holding>,
-  limit = 6,
+  limit = 40,
   today = new Date(),
 ): UpcomingPayment[] {
   const byTicker = groupByTicker(payments)
