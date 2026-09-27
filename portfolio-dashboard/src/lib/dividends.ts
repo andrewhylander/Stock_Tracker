@@ -158,6 +158,33 @@ function trailingFor(payments: DividendPayment[], today: Date): DividendPayment[
     .sort((a, b) => a.ex_date.localeCompare(b.ex_date))
 }
 
+/**
+ * A trailing-window payment, swapped for a newer declared amount if one is
+ * already known for that same annual slot.
+ *
+ * KNOS's October final has been declared at 19.8p, but the shares do not go
+ * ex until 1 October, so the trailing window still holds last year's 19.1p.
+ * The rate a source like StockEvents quotes counts a dividend the moment a
+ * company announces it; this app counts it once it is legally owed, which is
+ * a deliberately more conservative choice -- but there is no reason to keep
+ * using a stale amount once a newer one has genuinely been declared. A
+ * payment 325-405 days after a trailing one is that same slot's next
+ * occurrence, so if it is real (not a projection of our own making), its
+ * amount supersedes the older figure.
+ */
+function supersedeWithDeclared(trailing: DividendPayment[], all: DividendPayment[]): DividendPayment[] {
+  return trailing.map(p => {
+    const from = parseDate(p.ex_date).getTime()
+    const next = all.find(q =>
+      !isProjected(q) &&
+      q.ex_date !== p.ex_date &&
+      parseDate(q.ex_date).getTime() >= from + 325 * 86_400_000 &&
+      parseDate(q.ex_date).getTime() <= from + 405 * 86_400_000
+    )
+    return next ?? p
+  })
+}
+
 function groupByTicker(payments: DividendPayment[]): Map<string, DividendPayment[]> {
   const map = new Map<string, DividendPayment[]>()
   for (const p of payments) {
@@ -180,7 +207,7 @@ export function projectPayments(payments: DividendPayment[], today = new Date())
 
   for (const [, list] of groupByTicker(payments)) {
     const trailing = trailingFor(list, today)
-    const { perPayment } = forwardRate(trailing)
+    const { perPayment } = forwardRate(supersedeWithDeclared(trailing, list))
 
     // Payments already published for a date still ahead of us. A projection
     // landing near one of these is the same quarterly slot seen twice: VWRL's
@@ -309,7 +336,10 @@ export function buildHoldingDividends(
 
     const trailing = trailingFor(all, today)
 
-    const perShareAnnual = forwardRate(trailing).annual
+    // The rate uses the newest known amount for each slot, even one declared
+    // but not yet gone ex; "Paid in" below deliberately does not, since that
+    // is a record of when payments have actually landed historically.
+    const perShareAnnual = forwardRate(supersedeWithDeclared(trailing, all)).annual
     const annualIncome   = perShareAnnual * h.shares
 
     const quarters = [0, 0, 0, 0]
