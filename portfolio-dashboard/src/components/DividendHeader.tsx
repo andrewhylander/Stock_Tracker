@@ -24,6 +24,7 @@ export default function DividendHeader({ rows }: Props) {
       <div className="flex items-center gap-8 mt-5 flex-wrap">
         <Stat value={fmtGbp(annual / 12)} label="Monthly" />
         <Stat value={fmtGbp(annual / 365)} label="Daily" />
+        <Stat value={fmtGbp(annual / 365 / 24)} label="Hourly" />
         <Stat value={`${yieldPct.toFixed(2)}%`} label="Yield" />
         <Stat value={`${yocPct.toFixed(2)}%`} label="Yield on cost" accent />
       </div>
