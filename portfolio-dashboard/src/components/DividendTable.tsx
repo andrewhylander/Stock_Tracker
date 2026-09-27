@@ -92,22 +92,41 @@ export default function DividendTable({ rows }: Props) {
                   </td>
 
                   <td className="px-3 py-3">
-                    <div className="flex items-end justify-center gap-1.5">
-                      {r.quarters.map((paid, i) => (
-                        <div key={i} className="flex flex-col items-center gap-1">
-                          <span
-                            title={`${QUARTERS[i]}${paid ? '' : ' — no payment'}`}
-                            className="w-2.5 rounded-sm transition-colors"
-                            style={{
-                              height: paid ? '1.15rem' : '0.5rem',
-                              background: paid ? 'var(--gold)' : 'rgba(255,255,255,0.08)',
-                            }}
-                          />
-                          <span className="text-[0.55rem] text-[var(--muted)] leading-none">
-                            {QUARTERS[i]}
-                          </span>
-                        </div>
-                      ))}
+                    <div className="flex flex-col items-center gap-1.5">
+                      <div className="flex items-end justify-center gap-1.5">
+                        {r.quarters.map((count, i) => (
+                          <div key={i} className="flex flex-col items-center gap-1">
+                            {/* One mark per payment, so a quarter carrying two
+                                does not look like a quarter carrying one. */}
+                            <div className="flex items-end gap-[2px] h-[1.15rem]">
+                              {count > 0 ? (
+                                Array.from({ length: count }).map((_, j) => (
+                                  <span
+                                    key={j}
+                                    title={`${QUARTERS[i]} — ${count} payment${count > 1 ? 's' : ''}`}
+                                    className="w-2 h-full rounded-sm"
+                                    style={{ background: 'var(--gold)' }}
+                                  />
+                                ))
+                              ) : (
+                                <span
+                                  title={`${QUARTERS[i]} — no payment`}
+                                  className="w-2 h-2 rounded-sm self-end"
+                                  style={{ background: 'rgba(255,255,255,0.08)' }}
+                                />
+                              )}
+                            </div>
+                            <span className="text-[0.55rem] text-[var(--muted)] leading-none">
+                              {QUARTERS[i]}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                      {r.paymentsPerYear > 0 && (
+                        <span className="text-[0.6rem] text-[var(--muted)]">
+                          {r.paymentsPerYear}&times; a year
+                        </span>
+                      )}
                     </div>
                   </td>
 

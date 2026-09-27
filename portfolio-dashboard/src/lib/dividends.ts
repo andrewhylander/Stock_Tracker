@@ -23,7 +23,11 @@ export interface HoldingDividend extends Holding {
   annualIncome: number     // GBP
   yieldPct: number         // against market value
   yieldOnCostPct: number   // against cost basis
-  quarters: boolean[]      // which of Q1..Q4 saw a payment in the last 12 months
+  // Payments per quarter rather than a yes/no: KNOS pays in October and
+  // November, both Q4, so a boolean collapsed two payments into one mark and
+  // read as though it paid annually.
+  quarters: number[]
+  paymentsPerYear: number
   payments: DividendPayment[]
 }
 
@@ -262,8 +266,8 @@ export function buildHoldingDividends(
     const perShareAnnual = forwardRate(trailing).annual
     const annualIncome   = perShareAnnual * h.shares
 
-    const quarters = [false, false, false, false]
-    for (const p of trailing) quarters[Math.floor(parseDate(p.ex_date).getMonth() / 3)] = true
+    const quarters = [0, 0, 0, 0]
+    for (const p of trailing) quarters[Math.floor(parseDate(p.ex_date).getMonth() / 3)] += 1
 
     rows.push({
       ...h,
@@ -272,6 +276,7 @@ export function buildHoldingDividends(
       yieldPct:       h.marketValue > 0 ? (annualIncome / h.marketValue) * 100 : 0,
       yieldOnCostPct: h.costBasis > 0 ? (annualIncome / h.costBasis) * 100 : 0,
       quarters,
+      paymentsPerYear: trailing.length,
       payments: all,
     })
   }

@@ -47,7 +47,7 @@ export default function UpcomingDividends({ upcoming, categoryFor }: Props) {
                   </p>
                 </div>
                 <span
-                  className="px-2 py-0.5 rounded text-[0.65rem] font-semibold"
+                  className="px-2.5 py-1 rounded-md text-[0.9rem] font-bold tracking-tight"
                   style={{ color: catColor(cat), background: catBg(cat) }}
                 >
                   {u.ticker}
