@@ -28,7 +28,8 @@ export default function DividendHeader({ rows }: Props) {
       </div>
 
       <p className="text-[0.7rem] text-[var(--muted)] mt-5 pt-4 border-t border-[var(--border)]">
-        Trailing twelve months of payments, valued at the shares you hold today.
+        Each holding at its current declared rate where it pays a steady one, otherwise its
+        last twelve months. Valued at the shares you hold today.
       </p>
     </div>
   )
