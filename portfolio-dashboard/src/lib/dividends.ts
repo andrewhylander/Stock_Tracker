@@ -1,8 +1,10 @@
 import type { DividendPayment, Position } from './supabase'
 
-// Everything here is keyed on EX-DIVIDEND DATE, never pay date. Free data only
-// covers pay dates for the US holdings, which are a small slice of the income,
-// so the whole tab commits to ex-date and says so in the UI.
+// Everything here is keyed on PAY DATE where one is known, falling back to the
+// ex-dividend date where it is not. US holdings carry a real payment date from
+// Alpha Vantage; LSE holdings derive one from a published, verified per-ticker
+// lag. `pay_date_source` distinguishes the two so an estimate is never shown as
+// declared fact.
 //
 // Income figures assume TODAY's share count for every payment, past or future.
 // That makes this a "what does what I hold now yield" view rather than a
@@ -37,6 +39,19 @@ export interface MonthBucket {
   actual: number
   projected: number
   total: number
+}
+
+/**
+ * The date a payment is attributed to: when the cash lands if that is known,
+ * otherwise when the shares went ex. Charting on ex-dates put every payment
+ * two to three weeks earlier than the money actually arrived.
+ */
+export function effectiveDate(p: DividendPayment): string {
+  return p.pay_date || p.ex_date
+}
+
+export function isEstimatedDate(p: DividendPayment): boolean {
+  return p.pay_date_source === 'estimated'
 }
 
 /** 'YYYY-MM-DD' -> local Date, avoiding the UTC shift of `new Date(str)`. */
@@ -127,10 +142,10 @@ function trailingFor(payments: DividendPayment[], today: Date): DividendPayment[
   const yearAgo = new Date(today.getFullYear() - 1, today.getMonth(), today.getDate())
   return payments
     .filter(p => {
-      const ex = parseDate(p.ex_date)
-      return ex >= yearAgo && ex <= today
+      const d = parseDate(effectiveDate(p))
+      return d >= yearAgo && d <= today
     })
-    .sort((a, b) => a.ex_date.localeCompare(b.ex_date))
+    .sort((a, b) => effectiveDate(a).localeCompare(effectiveDate(b)))
 }
 
 function groupByTicker(payments: DividendPayment[]): Map<string, DividendPayment[]> {
@@ -157,15 +172,34 @@ export function projectPayments(payments: DividendPayment[], today = new Date())
     const trailing = trailingFor(list, today)
     const { perPayment } = forwardRate(trailing)
 
+    // Payments already published for a date still ahead of us. A projection
+    // landing near one of these is the same quarterly slot seen twice: VWRL's
+    // real 30 September payment and a projection of last year's, due 1 October,
+    // together counted one distribution as two.
+    const knownAhead = list
+      .filter(p => !isProjected(p) && parseDate(effectiveDate(p)) > today)
+      .map(p => parseDate(effectiveDate(p)).getTime())
+
     for (const p of trailing) {
-      const ex = parseDate(p.ex_date)
-      const next = new Date(ex.getFullYear() + 1, ex.getMonth(), ex.getDate())
+      const d = parseDate(effectiveDate(p))
+      const next = new Date(d.getFullYear() + 1, d.getMonth(), d.getDate())
       if (next <= today) continue
 
+      // Within five weeks of an already-published payment, this is that same
+      // distribution rather than a further one.
+      const collides = knownAhead.some(t => Math.abs(t - next.getTime()) <= 35 * 86_400_000)
+      if (collides) continue
+
+      const shift = (iso: string | null) => {
+        if (!iso) return null
+        const d = parseDate(iso)
+        return toISO(new Date(d.getFullYear() + 1, d.getMonth(), d.getDate()))
+      }
       out.push({
         ...p,
         id: -1,
-        ex_date: toISO(next),
+        ex_date: toISO(new Date(parseDate(p.ex_date).getFullYear() + 1, parseDate(p.ex_date).getMonth(), parseDate(p.ex_date).getDate())),
+        pay_date: shift(p.pay_date),
         amount_per_share_gbp: perPayment ?? Number(p.amount_per_share_gbp || 0),
         source: 'projected',
       })
@@ -180,7 +214,8 @@ export function isProjected(p: DividendPayment): boolean {
 
 export interface UpcomingPayment {
   ticker: string
-  exDate: string
+  date: string            // pay date where known, otherwise ex-date
+  estimatedDate: boolean  // the date is derived from a lag, not declared
   amount: number          // GBP, at today's share count
   perShare: number        // GBP
   projected: boolean
@@ -205,13 +240,13 @@ export function upcomingPayments(
     const shares = holdings.get(ticker)?.shares ?? 0
     if (!shares) continue
 
-    const sorted = list.slice().sort((a, b) => a.ex_date.localeCompare(b.ex_date))
-    const future = sorted.filter(p => parseDate(p.ex_date) > today)
-    const past = sorted.filter(p => parseDate(p.ex_date) <= today)
+    const sorted = list.slice().sort((a, b) => effectiveDate(a).localeCompare(effectiveDate(b)))
+    const future = sorted.filter(p => parseDate(effectiveDate(p)) > today)
+    const past = sorted.filter(p => parseDate(effectiveDate(p)) <= today)
 
     for (const p of future) {
       const perShare = Number(p.amount_per_share_gbp || 0)
-      const when = parseDate(p.ex_date)
+      const when = parseDate(effectiveDate(p))
 
       // Compare against the payment nearest a year earlier, not simply the
       // previous one. KNOS alternates a large October payment with a smaller
@@ -221,7 +256,7 @@ export function upcomingPayments(
       let prior: DividendPayment | null = null
       let bestGap = Infinity
       for (const q of past) {
-        const gap = Math.abs(parseDate(q.ex_date).getTime() - target)
+        const gap = Math.abs(parseDate(effectiveDate(q)).getTime() - target)
         if (gap < bestGap) { bestGap = gap; prior = q }
       }
 
@@ -234,7 +269,8 @@ export function upcomingPayments(
 
       out.push({
         ticker,
-        exDate: p.ex_date,
+        date: effectiveDate(p),
+        estimatedDate: isEstimatedDate(p),
         amount: perShare * shares,
         perShare,
         projected: isProjected(p),
@@ -243,7 +279,7 @@ export function upcomingPayments(
     }
   }
 
-  return out.sort((a, b) => a.exDate.localeCompare(b.exDate)).slice(0, limit)
+  return out.sort((a, b) => a.date.localeCompare(b.date)).slice(0, limit)
 }
 
 /** Per-holding dividend summary, trailing 12 months. */
@@ -259,7 +295,7 @@ export function buildHoldingDividends(
   for (const h of holdings.values()) {
     const all = (byTicker.get(h.ticker) ?? [])
       .slice()
-      .sort((a, b) => a.ex_date.localeCompare(b.ex_date))
+      .sort((a, b) => effectiveDate(a).localeCompare(effectiveDate(b)))
 
     const trailing = trailingFor(all, today)
 
@@ -267,7 +303,7 @@ export function buildHoldingDividends(
     const annualIncome   = perShareAnnual * h.shares
 
     const quarters = [0, 0, 0, 0]
-    for (const p of trailing) quarters[Math.floor(parseDate(p.ex_date).getMonth() / 3)] += 1
+    for (const p of trailing) quarters[Math.floor(parseDate(effectiveDate(p)).getMonth() / 3)] += 1
 
     rows.push({
       ...h,
@@ -297,14 +333,14 @@ export function monthlyIncome(
   }))
 
   for (const p of payments) {
-    const ex = parseDate(p.ex_date)
-    if (ex.getFullYear() !== year) continue
+    const d = parseDate(effectiveDate(p))
+    if (d.getFullYear() !== year) continue
 
     const shares = holdings.get(p.ticker)?.shares ?? 0
     const income = Number(p.amount_per_share_gbp || 0) * shares
     if (!income) continue
 
-    const b = buckets[ex.getMonth()]
+    const b = buckets[d.getMonth()]
     if (isProjected(p)) b.projected += income
     else b.actual += income
     b.total += income
@@ -326,6 +362,6 @@ export function cumulative(buckets: MonthBucket[]): number[] {
  */
 export function yearsCovered(payments: DividendPayment[], limit = 6): number[] {
   const years = new Set<number>()
-  for (const p of payments) years.add(parseDate(p.ex_date).getFullYear())
+  for (const p of payments) years.add(parseDate(effectiveDate(p)).getFullYear())
   return Array.from(years).sort((a, b) => b - a).slice(0, limit)
 }

@@ -22,19 +22,19 @@ export default function UpcomingDividends({ upcoming, categoryFor }: Props) {
           Upcoming
         </p>
         <p className="text-[0.7rem] text-[var(--muted)]">
-          Ex-dividend dates — cash follows a few weeks later
+          Payment dates
         </p>
       </div>
 
       <div className="flex gap-3 overflow-x-auto pb-1">
         {upcoming.map((u) => {
-          const days = daysUntil(u.exDate)
-          const d = parseDate(u.exDate)
+          const days = daysUntil(u.date)
+          const d = parseDate(u.date)
           const cat = categoryFor(u.ticker)
 
           return (
             <div
-              key={`${u.ticker}-${u.exDate}`}
+              key={`${u.ticker}-${u.date}`}
               className="shrink-0 w-[13.5rem] rounded-xl border border-[var(--border)] bg-[var(--surface2)] p-4"
             >
               <div className="flex items-start justify-between gap-2">
@@ -76,9 +76,11 @@ export default function UpcomingDividends({ upcoming, categoryFor }: Props) {
                 )}
               </div>
 
-              {u.projected && (
+              {(u.projected || u.estimatedDate) && (
                 <p className="text-[0.62rem] text-[var(--muted)] mt-2 pt-2 border-t border-[var(--border)]">
-                  Projected from last year
+                  {u.projected && u.estimatedDate ? 'Projected · date estimated'
+                    : u.projected ? 'Projected from last year'
+                    : 'Payment date estimated'}
                 </p>
               )}
             </div>

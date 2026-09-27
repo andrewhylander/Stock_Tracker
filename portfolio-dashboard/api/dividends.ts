@@ -25,10 +25,35 @@ const AV_MIN_INTERVAL_MS = 1200 // free key rejects faster than ~1/sec
 interface Payment {
   ticker: string
   ex_date: string
+  pay_date: string | null
+  pay_date_source: string | null
   amount_per_share: number
   currency: string
   amount_per_share_gbp: number
   source: string
+}
+
+/**
+ * Days between going ex-dividend and being paid, per ticker.
+ *
+ * Yahoo carries no pay date, so LSE holdings derive one. These lags are
+ * published and stable, and were checked against real pairs rather than
+ * assumed: VWRL has paid exactly 13 days after ex for seven consecutive
+ * distributions; KNOS paid 24 Oct on a 2 Oct ex-date, 12 Dec on 20 Nov, and
+ * has declared 23 Oct against a 1 Oct ex-date for 2026.
+ *
+ * A ticker absent from here gets no estimate -- better an empty pay date that
+ * falls back to the ex-date than an invented one.
+ */
+const EX_TO_PAY_LAG_DAYS: Record<string, number> = {
+  VWRL: 13,
+  KNOS: 22,
+}
+
+function addDays(iso: string, days: number): string {
+  const d = new Date(`${iso}T00:00:00Z`)
+  d.setUTCDate(d.getUTCDate() + days)
+  return d.toISOString().slice(0, 10)
 }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
@@ -82,11 +107,16 @@ async function fetchYahoo(ticker: string, usdPerGbp: number): Promise<Payment[]>
   const currency: string = result.meta?.currency ?? 'GBP'
   const dividends = result.events?.dividends ?? {}
 
+  const lag = EX_TO_PAY_LAG_DAYS[ticker.replace(/\.(LSE|L)$/i, '')]
+
   return Object.values<{ date: number; amount: number }>(dividends).map((d) => {
     const amount = Number(d.amount)
+    const exDate = new Date(d.date * 1000).toISOString().slice(0, 10)
     return {
       ticker,
-      ex_date: new Date(d.date * 1000).toISOString().slice(0, 10),
+      ex_date: exDate,
+      pay_date: lag != null ? addDays(exDate, lag) : null,
+      pay_date_source: lag != null ? 'estimated' : null,
       amount_per_share: amount,
       currency,
       amount_per_share_gbp: toGbp(amount, currency, usdPerGbp),
@@ -119,9 +149,13 @@ async function fetchAlphaVantage(
     .filter((r) => r.ex_dividend_date && r.amount)
     .map((r) => {
       const amount = Number(r.amount)
+      // payment_date comes through as 'None' on rows where it is not yet set.
+      const payDate = /^\d{4}-\d{2}-\d{2}$/.test(r.payment_date ?? '') ? r.payment_date : null
       return {
         ticker,
         ex_date: r.ex_dividend_date,
+        pay_date: payDate,
+        pay_date_source: payDate ? 'actual' : null,
         amount_per_share: amount,
         currency: 'USD',
         amount_per_share_gbp: toGbp(amount, 'USD', usdPerGbp),

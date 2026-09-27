@@ -137,9 +137,10 @@ export default function DividendChart({ payments, holdings }: Props) {
       )}
 
       <p className="text-[0.7rem] text-[var(--muted)] mt-4 pt-3 border-t border-[var(--border)]">
-        Months are <strong className="text-[var(--text)] font-semibold">ex-dividend dates</strong>, not
-        payment dates — cash typically lands a few weeks later. Free data covers pay dates for US
-        holdings only, so this tab uses ex-dates throughout rather than mixing the two.
+        Months are <strong className="text-[var(--text)] font-semibold">payment dates</strong> — when
+        the cash lands. US holdings carry the declared date; LSE holdings derive theirs from each
+        holding's published ex-to-pay gap, verified against past payments. Anything without either
+        falls back to its ex-dividend date.
       </p>
     </div>
   )

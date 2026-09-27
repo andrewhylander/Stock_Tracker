@@ -52,6 +52,8 @@ export interface DividendPayment {
   id: number
   ticker: string
   ex_date: string
+  pay_date: string | null
+  pay_date_source: 'actual' | 'estimated' | null
   amount_per_share: number
   currency: string
   amount_per_share_gbp: number

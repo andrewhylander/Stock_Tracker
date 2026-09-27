@@ -86,3 +86,18 @@ CREATE TABLE dividend_payments (
 
 CREATE INDEX idx_dividend_payments_ticker ON dividend_payments (ticker);
 CREATE INDEX idx_dividend_payments_ex_date ON dividend_payments (ex_date);
+
+-- Pay dates, added after the fact.
+--
+-- Alpha Vantage returns a real payment_date for US listings. Yahoo does not
+-- carry one at all, so LSE holdings derive theirs from the ex-date plus a
+-- per-ticker lag, which is stable and published: VWRL has paid exactly 13 days
+-- after going ex for seven consecutive distributions, KNOS 22 days across both
+-- its interim and final.
+--
+-- pay_date_source records which of the two a row is, so an estimate is never
+-- mistaken for a declared date.
+ALTER TABLE dividend_payments ADD COLUMN IF NOT EXISTS pay_date DATE;
+ALTER TABLE dividend_payments ADD COLUMN IF NOT EXISTS pay_date_source VARCHAR(16);
+
+CREATE INDEX IF NOT EXISTS idx_dividend_payments_pay_date ON dividend_payments (pay_date);
