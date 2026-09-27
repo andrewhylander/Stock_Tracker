@@ -57,3 +57,32 @@ CREATE VIEW portfolio_value_over_time AS
 SELECT snapshot_date, total_gbp_value
 FROM portfolio_daily
 ORDER BY snapshot_date;
+-- ---------------------------------------------------------------------------
+-- Dividend history
+--
+-- Populated by the /api/dividends serverless route, not by n8n. Two sources,
+-- because no single free API covers both halves of the portfolio:
+--   * Alpha Vantage  -- US listings. Has real pay dates, but returns an empty
+--                       array for LSE symbols (VWRL.LON, KNOS.LON).
+--   * Yahoo Finance  -- LSE listings. Ex-dates only, and no CORS header, which
+--                       is why this is fetched server-side.
+--
+-- Everything is keyed and charted on ex_date. Pay dates are deliberately NOT
+-- stored: we can only get them for the ~7% of income that comes from US
+-- holdings, and a half-populated column invites the false impression that the
+-- chart shows cash landing in the account.
+-- ---------------------------------------------------------------------------
+CREATE TABLE dividend_payments (
+    id SERIAL PRIMARY KEY,
+    ticker VARCHAR(255) NOT NULL,
+    ex_date DATE NOT NULL,
+    amount_per_share DECIMAL(15,6) NOT NULL,  -- in `currency`, as the source reported it
+    currency VARCHAR(10) NOT NULL,            -- GBp for KNOS.L, GBP for VWRL.L, USD for US
+    amount_per_share_gbp DECIMAL(15,6) NOT NULL,
+    source VARCHAR(32) NOT NULL,              -- 'alphavantage' | 'yahoo'
+    fetched_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE (ticker, ex_date)
+);
+
+CREATE INDEX idx_dividend_payments_ticker ON dividend_payments (ticker);
+CREATE INDEX idx_dividend_payments_ex_date ON dividend_payments (ex_date);
