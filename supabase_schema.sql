@@ -101,3 +101,24 @@ ALTER TABLE dividend_payments ADD COLUMN IF NOT EXISTS pay_date DATE;
 ALTER TABLE dividend_payments ADD COLUMN IF NOT EXISTS pay_date_source VARCHAR(16);
 
 CREATE INDEX IF NOT EXISTS idx_dividend_payments_pay_date ON dividend_payments (pay_date);
+
+-- Benchmark prices, for the "vs S&P 500" comparison on the Overview chart.
+--
+-- Undocumented until now: this table exists and is populated in the live
+-- Supabase project, but nothing in this repo writes to it -- not the n8n
+-- workflow, not any script here. It was set up directly against the
+-- database at some point outside this repo's history. Running this repo's
+-- schema against a fresh project will not populate it; the benchmark
+-- comparison will simply show no data until something is pointed at filling
+-- it in.
+--
+-- Only SPY has ever been observed in it, but `symbol` is kept generic rather
+-- than assumed single-purpose.
+CREATE TABLE benchmark_daily (
+    snapshot_date DATE NOT NULL,
+    symbol VARCHAR(32) NOT NULL,
+    price_usd DECIMAL(15,4) NOT NULL,
+    PRIMARY KEY (snapshot_date, symbol)
+);
+
+CREATE INDEX idx_benchmark_daily_snapshot_date ON benchmark_daily (snapshot_date);

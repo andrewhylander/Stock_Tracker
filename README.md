@@ -54,11 +54,12 @@ never writes back to it. Prices are the only thing fetched live.
 - `dividend_payments` — one row per holding per ex-dividend date. Written by the
   `/api/dividends` serverless route, **not** by n8n. Upserted on `(ticker, ex_date)`.
 
-**Known gap:** the dashboard also reads a `benchmark_daily` table
-(`snapshot_date`, `symbol`, `price_usd`) that exists in the live Supabase project
-but is not in `supabase_schema.sql` and is not written by the committed workflow.
-Running the schema file on a fresh project will give you a dashboard that errors
-on load until that table exists.
+**`benchmark_daily`** — the S&P 500 comparison on the Overview chart reads this
+table. It's now in `supabase_schema.sql`, so a fresh project will have it, but
+**nothing writes to it** — not the n8n workflow, not anything in this repo.
+It was populated directly against the live database at some point outside this
+repo's history. A fresh project's benchmark comparison will simply show no
+data until something is pointed at filling it in.
 
 ## Pricing sources, and what each one covers
 
@@ -101,10 +102,18 @@ Future months are projected by repeating the last twelve months' payments a year
 which reproduces each holding's real cadence without guessing a frequency. Projected bars
 are drawn as dashed outlines.
 
-**Refreshing.** `POST` or `GET` `/api/dividends`. It only refetches tickers whose data is
-over a week old, so repeated calls are cheap no-ops — which also keeps Alpha Vantage's
-free key (25 requests/day, one per second) well clear of its limits. `?force=1` overrides
-the staleness check and requires an `x-refresh-secret` header matching `DIVIDENDS_REFRESH_SECRET`.
+**Refreshing.** A Vercel Cron Job (`vercel.json`) hits `/api/dividends` every Monday at
+06:00 UTC — nothing needs visiting by hand. It only refetches tickers whose data is over
+a week old, so repeated calls (the cron included) are cheap no-ops — which also keeps
+Alpha Vantage's free key (25 requests/day, one per second) well clear of its limits.
+Trigger it manually the same way, `POST` or `GET` the route directly, if you want fresher
+data before the next scheduled run. `?force=1` overrides the staleness check and requires
+an `x-refresh-secret` header matching `DIVIDENDS_REFRESH_SECRET`.
+
+The route itself has no auth on a plain call — anyone who knows the URL can trigger it.
+Low risk: it only re-reads public price history and upserts your own Supabase table, and
+the staleness guard means repeated hits do nothing extra. Worth revisiting if that stops
+being true.
 
 ## Running the dashboard
 
