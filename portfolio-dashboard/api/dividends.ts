@@ -133,8 +133,21 @@ export default async function handler(req: any, res: any) {
   const avKey = process.env.ALPHAVANTAGE_API_KEY
 
   if (!supabaseUrl || !serviceKey) {
+    const missing = [
+      !supabaseUrl && 'SUPABASE_URL (or VITE_SUPABASE_URL)',
+      !serviceKey && 'SUPABASE_SERVICE_ROLE_KEY',
+    ].filter(Boolean)
+
+    // Name what is actually missing, and list which related variables this
+    // environment can see. Vercel applies env vars at build time, so a variable
+    // added after the last deploy is invisible until a redeploy -- which looks
+    // identical to never having set it. Names only, never values.
     return res.status(500).json({
-      error: 'Missing Supabase URL or SUPABASE_SERVICE_ROLE_KEY (the service role key must have no VITE_ prefix).',
+      error: `Missing ${missing.join(' and ')}. The service role key must have no VITE_ prefix.`,
+      visibleEnvKeys: Object.keys(process.env)
+        .filter((k) => /SUPABASE|ALPHAVANTAGE|VITE_/i.test(k))
+        .sort(),
+      hint: 'If the variable is set in Vercel but not listed here, it was added after this deployment was built. Redeploy.',
     })
   }
 
