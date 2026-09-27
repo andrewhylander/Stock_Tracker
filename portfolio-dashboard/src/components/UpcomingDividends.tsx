@@ -1,6 +1,7 @@
 import type { UpcomingPayment } from '../lib/dividends'
 import { parseDate } from '../lib/dividends'
 import { fmtGbp, catColor, catBg } from '../constants'
+import { logoUrl } from '../lib/logos'
 
 interface Props {
   upcoming: UpcomingPayment[]
@@ -38,13 +39,25 @@ export default function UpcomingDividends({ upcoming, categoryFor }: Props) {
               className="shrink-0 w-[13.5rem] rounded-xl border border-[var(--border)] bg-[var(--surface2)] p-4"
             >
               <div className="flex items-start justify-between gap-2">
-                <div>
-                  <p className="text-[1.5rem] font-bold leading-none tracking-tight">
-                    {d.getDate()}
-                  </p>
-                  <p className="text-[0.65rem] font-semibold uppercase tracking-widest text-[var(--muted)] mt-1">
-                    {d.toLocaleDateString('en-GB', { month: 'short' })}
-                  </p>
+                <div className="flex items-center gap-2.5">
+                  {logoUrl(u.ticker) && (
+                    <img
+                      src={logoUrl(u.ticker)!}
+                      alt=""
+                      className="w-8 h-8 rounded-full bg-white object-contain p-1 shrink-0"
+                      // Favicons occasionally fail to load; drop the element
+                      // rather than show a broken-image icon.
+                      onError={(e) => { e.currentTarget.style.display = 'none' }}
+                    />
+                  )}
+                  <div>
+                    <p className="text-[1.5rem] font-bold leading-none tracking-tight">
+                      {d.getDate()}
+                    </p>
+                    <p className="text-[0.65rem] font-semibold uppercase tracking-widest text-[var(--muted)] mt-1">
+                      {d.toLocaleDateString('en-GB', { month: 'short' })}
+                    </p>
+                  </div>
                 </div>
                 <span
                   className="px-2.5 py-1 rounded-md text-[0.9rem] font-bold tracking-tight"
