@@ -16,7 +16,15 @@ const TICKER_DOMAIN: Record<string, string> = {
   BMNR: 'bitminetech.io',
 }
 
+// Real brand assets, checked in under public/logos/, take priority over the
+// favicon lookup below where one has been supplied -- KNOS's favicon is a
+// plain gradient sphere with no wordmark, nothing like the real Kainos mark.
+const LOCAL_LOGO: Record<string, string> = {
+  KNOS: '/logos/kainos.png',
+}
+
 export function logoUrl(ticker: string, size = 64): string | null {
+  if (LOCAL_LOGO[ticker]) return LOCAL_LOGO[ticker]
   const domain = TICKER_DOMAIN[ticker]
   return domain ? `https://www.google.com/s2/favicons?domain=${domain}&sz=${size}` : null
 }
