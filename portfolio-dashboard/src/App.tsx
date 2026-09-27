@@ -4,6 +4,7 @@ import { supabase } from './lib/supabase'
 import type { PortfolioDaily, Position, BenchmarkDaily, DividendPayment } from './lib/supabase'
 import Overview from './pages/Overview'
 import Dividends from './pages/Dividends'
+import Retirement from './pages/Retirement'
 
 function missingViteEnv(names: string[]) {
   return names.filter((name) => !import.meta.env[name])
@@ -165,6 +166,7 @@ export default function App() {
         <nav className="flex items-center gap-1 border-b border-[var(--border)]">
           <Tab to="/">Overview</Tab>
           <Tab to="/dividends">Dividends</Tab>
+          <Tab to="/retirement">Retirement</Tab>
         </nav>
 
         {error && (
@@ -209,6 +211,7 @@ export default function App() {
               />
             }
           />
+          <Route path="/retirement" element={<Retirement />} />
         </Routes>
 
       </div>

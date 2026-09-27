@@ -1,0 +1,1083 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Retirement Runway</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #EEF1EC;
+    --panel: #FFFFFF;
+    --panel-line: #D7DED8;
+    --text: #142019;
+    --text-muted: #5B6A61;
+    --accent: #1F6F54;
+    --accent-soft: #DCEAE3;
+    --coast-line: #7FA695;
+    --need: #B8863B;
+    --need-soft: #F2E6CF;
+    --stop-line: #B23B2E;
+    --track: #DCE3DD;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0E1512;
+      --panel: #161F1A;
+      --panel-line: #263229;
+      --text: #E7EFE9;
+      --text-muted: #93A69B;
+      --accent: #4FAE8B;
+      --accent-soft: #1D2E27;
+      --coast-line: #7FCBAA;
+      --need: #D2A45B;
+      --need-soft: #2C2515;
+      --stop-line: #E0785F;
+      --track: #263229;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0E1512;
+    --panel: #161F1A;
+    --panel-line: #263229;
+    --text: #E7EFE9;
+    --text-muted: #93A69B;
+    --accent: #4FAE8B;
+    --accent-soft: #1D2E27;
+    --coast-line: #7FCBAA;
+    --need: #D2A45B;
+    --need-soft: #2C2515;
+    --stop-line: #E0785F;
+    --track: #263229;
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-padding-top: env(safe-area-inset-top, 0px); }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    -webkit-font-smoothing: antialiased;
+  }
+  .page {
+    max-width: 640px;
+    margin: 0 auto;
+    padding: 28px 18px 48px;
+  }
+  header {
+    margin-bottom: 22px;
+  }
+  header h1 {
+    font-family: 'Fraunces', Georgia, serif;
+    font-weight: 500;
+    font-size: 1.7rem;
+    margin: 0 0 6px;
+    letter-spacing: -0.01em;
+  }
+  header p {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 0.92rem;
+    line-height: 1.5;
+    max-width: 46ch;
+  }
+
+  .stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+  .stat {
+    background: var(--panel);
+    border: 1px solid var(--panel-line);
+    border-radius: 14px;
+    padding: 16px 14px;
+  }
+  .stat .label {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    line-height: 1.4;
+    margin-bottom: 8px;
+  }
+  .stat .value {
+    font-family: 'Fraunces', Georgia, serif;
+    font-size: 2rem;
+    line-height: 1;
+    font-weight: 500;
+  }
+  .stat.contrib .value { color: var(--accent); }
+  .stat.coast .value { color: var(--need); }
+  .stat.stopage .value { color: var(--stop-line); }
+  .stat.coastfire .value { color: var(--text); font-size: 1.7rem; }
+  .stat.span2 { grid-column: 1 / -1; }
+  .stat .sub {
+    margin-top: 6px;
+    font-size: 0.76rem;
+    color: var(--text-muted);
+  }
+
+  .chart-card {
+    background: var(--panel);
+    border: 1px solid var(--panel-line);
+    border-radius: 14px;
+    padding: 16px 12px 8px;
+    margin-bottom: 20px;
+  }
+  .chart-card .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+    padding: 0 4px 12px;
+    font-size: 0.76rem;
+    color: var(--text-muted);
+  }
+  .legend span {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: none;
+    border: none;
+    padding: 4px 2px;
+    margin: 0;
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 0.76rem;
+    color: var(--text-muted);
+    cursor: pointer;
+  }
+  .legend-item.active { color: var(--text); }
+  .info-icon {
+    font-size: 0.7rem;
+    opacity: 0.6;
+  }
+  .legend-explain {
+    margin: 0 4px 12px;
+    padding: 10px 12px;
+    background: var(--accent-soft);
+    border: 1px solid var(--panel-line);
+    border-radius: 10px;
+    font-size: 0.8rem;
+    line-height: 1.5;
+    color: var(--text);
+  }
+  .swatch {
+    width: 12px;
+    height: 3px;
+    border-radius: 2px;
+    display: inline-block;
+  }
+  .swatch-dotted {
+    width: 14px;
+    height: 0;
+    background: none !important;
+    border-top-width: 3px;
+    border-top-style: dotted;
+    border-radius: 0;
+  }
+  .chart-wrap { position: relative; height: 380px; }
+
+  details.group {
+    background: var(--panel);
+    border: 1px solid var(--panel-line);
+    border-radius: 14px;
+    margin-bottom: 10px;
+    overflow: hidden;
+  }
+  details.group summary {
+    list-style: none;
+    cursor: pointer;
+    padding: 14px 16px;
+    font-size: 0.92rem;
+    font-weight: 500;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  details.group summary::-webkit-details-marker { display: none; }
+  details.group summary::after {
+    content: '+';
+    font-family: 'Fraunces', serif;
+    font-size: 1.1rem;
+    color: var(--text-muted);
+  }
+  details.group[open] summary::after { content: '–'; }
+  .group-body {
+    padding: 2px 16px 16px;
+    border-top: 1px solid var(--panel-line);
+  }
+
+  .field { margin-top: 16px; }
+  .field:first-child { margin-top: 4px; }
+  .field-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 6px;
+  }
+  .field-row label { font-size: 0.85rem; color: var(--text); }
+  .field-row .val {
+    font-family: 'Fraunces', Georgia, serif;
+    font-size: 0.95rem;
+    color: var(--accent);
+    font-weight: 500;
+  }
+  .field .hint {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    line-height: 1.4;
+    margin: 6px 0 0;
+  }
+  input[type="range"] {
+    -webkit-appearance: none;
+    width: 100%;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--track);
+    outline: none;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--accent);
+    border: 3px solid var(--panel);
+    box-shadow: 0 0 0 1px var(--accent);
+    cursor: pointer;
+  }
+  input[type="range"]::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--accent);
+    border: 3px solid var(--panel);
+    box-shadow: 0 0 0 1px var(--accent);
+    cursor: pointer;
+  }
+
+  .toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 0;
+  }
+  .toggle-row span { font-size: 0.85rem; }
+  .toggle-row .hint {
+    display: block;
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    font-weight: 400;
+    margin-top: 3px;
+    line-height: 1.4;
+  }
+  .switch {
+    position: relative;
+    width: 42px;
+    height: 24px;
+    flex-shrink: 0;
+  }
+  .switch input { opacity: 0; width: 0; height: 0; }
+  .switch .track {
+    position: absolute; inset: 0;
+    background: var(--track);
+    border-radius: 999px;
+    transition: background .15s;
+  }
+  .switch .track::before {
+    content: '';
+    position: absolute;
+    height: 18px; width: 18px;
+    left: 3px; top: 3px;
+    background: var(--panel);
+    border-radius: 50%;
+    transition: transform .15s;
+    box-shadow: 0 1px 2px rgba(0,0,0,.25);
+  }
+  .switch input:checked + .track { background: var(--accent); }
+  .switch input:checked + .track::before { transform: translateX(18px); }
+
+  footer {
+    margin-top: 22px;
+    font-size: 0.76rem;
+    color: var(--text-muted);
+    line-height: 1.6;
+  }
+
+  .breakdown-note {
+    margin: 4px 0 10px;
+    font-size: 0.82rem;
+    color: var(--text-muted);
+  }
+  .breakdown-list {
+    list-style: none;
+    margin: 0 0 12px;
+    padding: 0;
+    border-top: 1px solid var(--panel-line);
+  }
+  .breakdown-list li {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 7px 0;
+    border-bottom: 1px solid var(--panel-line);
+    font-size: 0.82rem;
+  }
+  .breakdown-list li .name { color: var(--text); }
+  .breakdown-list li .name .flag {
+    display: block;
+    font-size: 0.72rem;
+    color: var(--need);
+  }
+  .breakdown-list li .amt {
+    font-family: 'Fraunces', Georgia, serif;
+    color: var(--text);
+    white-space: nowrap;
+  }
+  .breakdown-list li.credit .amt { color: var(--accent); }
+  .breakdown-total {
+    font-size: 0.85rem;
+    margin-bottom: 6px;
+  }
+  .breakdown-total strong {
+    font-family: 'Fraunces', Georgia, serif;
+    font-weight: 500;
+  }
+  .breakdown-total.muted { color: var(--text-muted); font-size: 0.8rem; }
+  .breakdown-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+    flex-wrap: wrap;
+  }
+  .pill-btn {
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 0.78rem;
+    color: var(--accent);
+    background: var(--accent-soft);
+    border: 1px solid var(--panel-line);
+    border-radius: 999px;
+    padding: 7px 14px;
+    cursor: pointer;
+  }
+  .pill-btn:active { opacity: 0.8; }
+  .reset-row {
+    display: flex;
+    justify-content: center;
+    margin-top: 18px;
+  }
+  .reset-btn {
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    background: transparent;
+    border: 1px solid var(--panel-line);
+    border-radius: 999px;
+    padding: 8px 18px;
+    cursor: pointer;
+  }
+  .reset-btn:active { opacity: 0.8; }
+  .reset-btn.done { color: var(--accent); border-color: var(--accent); }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header>
+    <h1>Retirement runway</h1>
+    <p>Where your portfolio's growth line crosses what you'd need to retire — under the assumptions below.</p>
+  </header>
+
+  <div class="stats">
+    <div class="stat contrib">
+      <div class="label">Earliest age you could<br>stop contributing</div>
+      <div class="value" id="contribAgeOut">—</div>
+      <div class="sub" id="contribSub"></div>
+    </div>
+    <div class="stat coastfire">
+      <div class="label" id="stopAgePotLabel">Coast FIRE number</div>
+      <div class="value" id="stopAgePot">—</div>
+      <div class="sub">pot needed at age <span id="stopAgePotAgeSub"></span> to stop contributing and still last to <span id="stopAgePotPlanEnd"></span></div>
+    </div>
+    <div class="stat coast">
+      <div class="label">Stop contributing<br>today</div>
+      <div class="value" id="coastAgeOut">—</div>
+      <div class="sub" id="coastSub"></div>
+    </div>
+    <div class="stat stopage">
+      <div class="label">Stop contributing at age <span id="stopAgeLabel"></span></div>
+      <div class="value" id="stopAgeOut">—</div>
+      <div class="sub" id="stopAgeSub"></div>
+    </div>
+  </div>
+
+  <div class="chart-card">
+    <div class="legend">
+      <button type="button" class="legend-item" data-info="contribute60"><i class="swatch" style="background:var(--accent)"></i>contribute to 60, then retire<span class="info-icon">ⓘ</span></button>
+      <button type="button" class="legend-item" data-info="stopToday"><i class="swatch swatch-dotted" style="border-color:var(--coast-line)"></i>stop contributing today<span class="info-icon">ⓘ</span></button>
+      <button type="button" class="legend-item" data-info="potNeeded"><i class="swatch" style="background:var(--need)"></i>pot needed (state pension model)<span class="info-icon">ⓘ</span></button>
+      <button type="button" class="legend-item" data-info="stopChosen"><i class="swatch" style="background:var(--stop-line)"></i>stop at your chosen age<span class="info-icon">ⓘ</span></button>
+    </div>
+    <div class="legend-explain" id="legendExplain" hidden></div>
+    <div class="chart-wrap"><canvas id="chart"></canvas></div>
+  </div>
+
+  <details class="group" open>
+    <summary>Where you are today</summary>
+    <div class="group-body">
+      <div class="field">
+        <div class="field-row"><label>Current age</label><span class="val" id="currentAgeVal"></span></div>
+        <input type="range" id="currentAge" min="25" max="60" step="1" value="42">
+      </div>
+      <div class="field">
+        <div class="field-row"><label>Current combined portfolio</label><span class="val" id="currentPotVal"></span></div>
+        <input type="range" id="currentPot" min="50000" max="1500000" step="5000" value="487500">
+        <p class="hint">Pension plus invested assets, today.</p>
+      </div>
+    </div>
+  </details>
+
+  <details class="group" open>
+    <summary>What you're paying in</summary>
+    <div class="group-body">
+      <div class="field">
+        <div class="field-row"><label>Monthly contribution</label><span class="val" id="monthlyVal"></span></div>
+        <input type="range" id="monthly" min="0" max="6000" step="100" value="3400">
+      </div>
+      <div class="field">
+        <div class="field-row"><label>Annual bonus sacrificed to pension</label><span class="val" id="bonusAnnualVal"></span></div>
+        <input type="range" id="bonusAnnual" min="0" max="50000" step="500" value="25000">
+      </div>
+      <div class="field">
+        <div class="field-row"><label>Bonus continues until age</label><span class="val" id="bonusEndAgeVal"></span></div>
+        <input type="range" id="bonusEndAge" min="42" max="70" step="1" value="42">
+        <p class="hint">Set this to your current age to assume no bonus at all.</p>
+      </div>
+      <div class="field">
+        <div class="field-row"><label>Try stopping contributions at age</label><span class="val" id="stopAgeVal"></span></div>
+        <input type="range" id="stopAge" min="25" max="70" step="1" value="50">
+        <p class="hint">Drives the red line on the chart.</p>
+      </div>
+    </div>
+  </details>
+
+  <details class="group">
+    <summary>What you'll spend</summary>
+    <div class="group-body">
+      <div class="field">
+        <div class="field-row"><label>Household expenses (until 60)</label><span class="val" id="spendVal"></span></div>
+        <input type="range" id="spend" min="20000" max="100000" step="100" value="39891">
+        <p class="hint">Excludes holidays — those are set separately below.</p>
+      </div>
+      <div class="field">
+        <div class="field-row"><label>Holiday spend per year (until 60)</label><span class="val" id="holidaySpendVal"></span></div>
+        <input type="range" id="holidaySpend" min="0" max="25000" step="100" value="10000">
+      </div>
+      <div class="field">
+        <div class="field-row"><label>Planned spend from age 60</label><span class="val" id="spendAfter60Val"></span></div>
+        <input type="range" id="spendAfter60" min="20000" max="150000" step="500" value="60000">
+        <p class="hint">All-in, holidays included — mortgage is gone by then.</p>
+      </div>
+    </div>
+  </details>
+
+  <details class="group">
+    <summary>What's included in that number</summary>
+    <div class="group-body">
+      <p class="breakdown-note">Your household budget, excluding holidays:</p>
+      <ul class="breakdown-list" id="breakdownList"></ul>
+      <div class="breakdown-total">Total: <strong id="breakdownMonthly"></strong>/month → <strong id="breakdownAnnual"></strong>/year</div>
+      <div class="breakdown-total muted">Mortgage clears in ~14 years (around age <span id="mortgageAge"></span>) — from then, this drops to <strong id="breakdownPostMortgage"></strong>/year</div>
+      <div class="breakdown-actions">
+        <button type="button" class="pill-btn" data-set="39891">Use current spend</button>
+        <button type="button" class="pill-btn" data-set="29554">Use post-mortgage spend</button>
+      </div>
+    </div>
+  </details>
+
+  <details class="group">
+    <summary>State pension &amp; how long to plan for</summary>
+    <div class="group-body">
+      <div class="field">
+        <div class="field-row"><label>Combined state pension (per year)</label><span class="val" id="spAmountVal"></span></div>
+        <input type="range" id="spAmount" min="0" max="35000" step="500" value="25000">
+        <p class="hint">You and your wife together, once you both qualify.</p>
+      </div>
+      <div class="field">
+        <div class="field-row"><label>State pension age</label><span class="val" id="spAgeVal"></span></div>
+        <input type="range" id="spAge" min="60" max="70" step="1" value="68">
+      </div>
+      <div class="field">
+        <div class="field-row"><label>Plan to age</label><span class="val" id="endAgeVal"></span></div>
+        <input type="range" id="endAge" min="80" max="105" step="1" value="90">
+        <p class="hint">The money needs to last this long.</p>
+      </div>
+    </div>
+  </details>
+
+  <details class="group">
+    <summary>Growth assumptions</summary>
+    <div class="group-body">
+      <div class="field">
+        <div class="field-row"><label>Return while building (real, annual)</label><span class="val" id="accRateVal"></span></div>
+        <input type="range" id="accRate" min="2" max="10" step="0.5" value="7">
+        <p class="hint">After inflation, so all figures stay in today's money.</p>
+      </div>
+      <div class="toggle-row">
+        <span>Use the same return in retirement</span>
+        <label class="switch"><input type="checkbox" id="sameRate" checked><span class="track"></span></label>
+      </div>
+      <div class="field" id="decRateField" style="display:none;">
+        <div class="field-row"><label>Return in retirement (real, annual)</label><span class="val" id="decRateVal"></span></div>
+        <input type="range" id="decRate" min="1" max="8" step="0.5" value="4">
+      </div>
+      <div class="toggle-row">
+        <span>Nominal ÷12 compounding<br><span class="hint">matches most online calculators — effectively assumes a slightly higher true annual return</span></span>
+        <label class="switch"><input type="checkbox" id="nominalCompounding"><span class="track"></span></label>
+      </div>
+    </div>
+  </details>
+
+  <div class="reset-row">
+    <button type="button" class="reset-btn" id="resetBtn">Reset to defaults</button>
+  </div>
+
+  <footer>
+    Illustrative only — real, inflation-adjusted returns. The two coloured lines model actual spending: current expenses until 60, then your planned figure, run forward until the pot runs out (if it does). The amber line is a separate reference showing the pot theoretically needed once state pension income is factored in. Not financial advice.
+  </footer>
+
+</div>
+
+<script>
+const els = {
+  currentAge: document.getElementById('currentAge'),
+  currentPot: document.getElementById('currentPot'),
+  monthly: document.getElementById('monthly'),
+  stopAge: document.getElementById('stopAge'),
+  bonusAnnual: document.getElementById('bonusAnnual'),
+  bonusEndAge: document.getElementById('bonusEndAge'),
+  accRate: document.getElementById('accRate'),
+  sameRate: document.getElementById('sameRate'),
+  nominalCompounding: document.getElementById('nominalCompounding'),
+  decRate: document.getElementById('decRate'),
+  decRateField: document.getElementById('decRateField'),
+  spend: document.getElementById('spend'),
+  holidaySpend: document.getElementById('holidaySpend'),
+  spendAfter60: document.getElementById('spendAfter60'),
+  spAmount: document.getElementById('spAmount'),
+  spAge: document.getElementById('spAge'),
+  endAge: document.getElementById('endAge'),
+
+  currentAgeVal: document.getElementById('currentAgeVal'),
+  currentPotVal: document.getElementById('currentPotVal'),
+  monthlyVal: document.getElementById('monthlyVal'),
+  stopAgeVal: document.getElementById('stopAgeVal'),
+  bonusAnnualVal: document.getElementById('bonusAnnualVal'),
+  bonusEndAgeVal: document.getElementById('bonusEndAgeVal'),
+  accRateVal: document.getElementById('accRateVal'),
+  decRateVal: document.getElementById('decRateVal'),
+  spendVal: document.getElementById('spendVal'),
+  holidaySpendVal: document.getElementById('holidaySpendVal'),
+  spendAfter60Val: document.getElementById('spendAfter60Val'),
+  spAmountVal: document.getElementById('spAmountVal'),
+  spAgeVal: document.getElementById('spAgeVal'),
+  endAgeVal: document.getElementById('endAgeVal'),
+};
+
+const fmtGBP = (n) => '£' + Math.round(n).toLocaleString('en-GB');
+const fmtGBPk = (n) => {
+  const r = Math.round(n);
+  if (Math.abs(r) >= 1000000) return '£' + (r/1000000).toFixed(r % 1000000 === 0 ? 0 : 1) + 'm';
+  if (Math.abs(r) >= 1000) return '£' + (r/1000).toFixed(r % 1000 === 0 ? 0 : 1) + 'k';
+  return '£' + r;
+};
+
+function requiredPotAt(age, r, spAge, spAmount, phase1Spend, endAge) {
+  const phase2Need = Math.max(phase1Spend - spAmount, 0);
+  let phase1Years, phase2Years;
+  if (age >= spAge) { phase1Years = 0; phase2Years = Math.max(endAge - age, 0); }
+  else { phase1Years = spAge - age; phase2Years = Math.max(endAge - spAge, 0); }
+  function simulate(pot) {
+    let bal = pot;
+    for (let y = 0; y < phase1Years; y++) { bal -= phase1Spend; bal *= (1 + r); }
+    for (let y = 0; y < phase2Years; y++) { bal -= phase2Need; bal *= (1 + r); }
+    return bal;
+  }
+  let lo = 0, hi = 6000000;
+  for (let i = 0; i < 60; i++) {
+    const mid = (lo + hi) / 2;
+    if (simulate(mid) < 0) lo = mid; else hi = mid;
+  }
+  return (lo + hi) / 2;
+}
+
+function accumulateSeries(base, monthly, annualR, startAge, endAge, nominal) {
+  const monthlyR = nominal ? (annualR / 12) : (Math.pow(1 + annualR, 1/12) - 1);
+  let val = base;
+  const series = [{ x: startAge, y: val }];
+  for (let age = startAge + 1; age <= endAge; age++) {
+    for (let m = 0; m < 12; m++) val = val * (1 + monthlyR) + monthly;
+    series.push({ x: age, y: val });
+  }
+  return series;
+}
+
+function accumulateSeriesWithBonus(base, monthly, bonusAnnual, bonusEndAge, annualR, startAge, endAge, nominal) {
+  const monthlyR = nominal ? (annualR / 12) : (Math.pow(1 + annualR, 1/12) - 1);
+  let val = base;
+  const series = [{ x: startAge, y: val }];
+  for (let age = startAge + 1; age <= endAge; age++) {
+    const yearAge = age - 1; // age during the year the contributions are made
+    const bonusMonthly = (yearAge < bonusEndAge) ? (bonusAnnual / 12) : 0;
+    const totalMonthly = monthly + bonusMonthly;
+    for (let m = 0; m < 12; m++) val = val * (1 + monthlyR) + totalMonthly;
+    series.push({ x: age, y: val });
+  }
+  return series;
+}
+
+function twoPhaseDepletion(startBalance, startAge, r, thresholdAge, spendBefore, spendAfter, planEnd) {
+  let bal = startBalance;
+  const series = [{ x: startAge, y: Math.max(bal, 10000) }];
+  let depletedAge = null;
+  for (let age = startAge; age < planEnd; age++) {
+    const need = (age < thresholdAge) ? spendBefore : spendAfter;
+    bal -= need;
+    bal *= (1 + r);
+    if (bal <= 0 && depletedAge == null) depletedAge = age + 1;
+    series.push({ x: age + 1, y: Math.max(bal, 10000) });
+  }
+  return { series, depletedAge };
+}
+
+function findEarliestSafeStopAge(currentPot, monthly, bonusAnnual, bonusEndAge, accRate, decRate, thresholdAge, spendBefore, spendAfter, currentAge, planEnd, nominal) {
+  for (let stopAge = currentAge; stopAge < planEnd; stopAge++) {
+    const accum = accumulateSeriesWithBonus(currentPot, monthly, bonusAnnual, bonusEndAge, accRate, currentAge, stopAge, nominal);
+    const balance = accum[accum.length - 1].y;
+    const { depletedAge } = twoPhaseDepletion(balance, stopAge, decRate, thresholdAge, spendBefore, spendAfter, planEnd);
+    if (depletedAge == null) return stopAge;
+  }
+  return null;
+}
+
+function findCrossover(series, requiredByAge) {
+  for (let i = 0; i < series.length; i++) {
+    if (series[i].y >= requiredByAge[i].y) return series[i].x;
+  }
+  return null;
+}
+
+const crossoverPlugin = {
+  id: 'crossoverLines',
+  afterDatasetsDraw(chart) {
+    const cfg = chart.config.options.plugins.crossoverLines;
+    if (!cfg || !cfg.lines) return;
+    const { ctx, chartArea, scales } = chart;
+    cfg.lines.forEach(line => {
+      if (line.age == null) return;
+      const x = scales.x.getPixelForValue(line.age);
+      if (x < chartArea.left || x > chartArea.right) return;
+      ctx.save();
+      ctx.strokeStyle = line.color;
+      ctx.setLineDash([4, 4]);
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(x, chartArea.top);
+      ctx.lineTo(x, chartArea.bottom);
+      ctx.stroke();
+      ctx.restore();
+    });
+  }
+};
+Chart.register(crossoverPlugin);
+
+let chart;
+
+function currentTextColor() {
+  return getComputedStyle(document.documentElement).getPropertyValue('--text').trim();
+}
+function currentMutedColor() {
+  return getComputedStyle(document.documentElement).getPropertyValue('--text-muted').trim();
+}
+function currentAccent() { return getComputedStyle(document.documentElement).getPropertyValue('--accent').trim(); }
+function currentAccentSoft() { return getComputedStyle(document.documentElement).getPropertyValue('--coast-line').trim(); }
+function currentNeed() { return getComputedStyle(document.documentElement).getPropertyValue('--need').trim(); }
+function currentStopLine() { return getComputedStyle(document.documentElement).getPropertyValue('--stop-line').trim(); }
+function currentLine() { return getComputedStyle(document.documentElement).getPropertyValue('--panel-line').trim(); }
+
+function recompute() {
+  const currentAge = +els.currentAge.value;
+  const currentPot = +els.currentPot.value;
+  const monthly = +els.monthly.value;
+  const bonusAnnual = +els.bonusAnnual.value;
+  const bonusEndAge = Math.max(+els.bonusEndAge.value, currentAge);
+  const accRate = (+els.accRate.value) / 100;
+  const decRate = els.sameRate.checked ? accRate : (+els.decRate.value) / 100;
+  const spendBase = +els.spend.value;
+  const holidaySpend = +els.holidaySpend.value;
+  const spend = spendBase + holidaySpend; // pre-retirement spend including holidays
+  const spendAfter60 = +els.spendAfter60.value;
+  const spAmount = +els.spAmount.value;
+  const spAge = +els.spAge.value;
+  const endAge = +els.endAge.value;
+
+  els.currentAgeVal.textContent = currentAge;
+  els.currentPotVal.textContent = fmtGBP(currentPot);
+  els.monthlyVal.textContent = fmtGBP(monthly) + '/mo';
+  els.bonusAnnualVal.textContent = fmtGBP(bonusAnnual) + '/yr';
+  els.bonusEndAgeVal.textContent = bonusEndAge;
+  els.accRateVal.textContent = (+els.accRate.value).toFixed(1) + '%';
+  els.decRateVal.textContent = (+els.decRate.value).toFixed(1) + '%';
+  els.spendVal.textContent = fmtGBP(spendBase) + '/yr';
+  els.holidaySpendVal.textContent = fmtGBP(holidaySpend) + '/yr';
+  els.spendAfter60Val.textContent = fmtGBP(spendAfter60) + '/yr';
+  els.spAmountVal.textContent = fmtGBP(spAmount) + '/yr';
+  els.spAgeVal.textContent = spAge;
+  els.endAgeVal.textContent = endAge;
+  els.decRateField.style.display = els.sameRate.checked ? 'none' : 'block';
+
+  const planEnd = endAge;
+  const nominal = els.nominalCompounding.checked;
+  const RETIRE_BUMP_AGE = 60;
+
+  // Line A: stop contributing today — spend current expenses until 60, then the planned figure.
+  const lineA = twoPhaseDepletion(currentPot, currentAge, decRate, RETIRE_BUMP_AGE, spend, spendAfter60, planEnd);
+  const noContrib = lineA.series;
+  const coastAge = lineA.depletedAge;
+
+  // Line B: keep contributing £X/month until 60 (no withdrawals while still working),
+  // then retire and draw down at the planned spend from 60 onward.
+  const accumPhaseEnd = Math.min(RETIRE_BUMP_AGE, planEnd);
+  const accumPhase = accumulateSeriesWithBonus(currentPot, monthly, bonusAnnual, bonusEndAge, accRate, currentAge, accumPhaseEnd, nominal);
+  let withContrib = accumPhase;
+  let contribAge = null;
+  if (accumPhaseEnd < planEnd) {
+    const balanceAt60 = accumPhase[accumPhase.length - 1].y;
+    const depletion = twoPhaseDepletion(balanceAt60, accumPhaseEnd, decRate, RETIRE_BUMP_AGE, spend, spendAfter60, planEnd);
+    withContrib = accumPhase.slice(0, -1).concat(depletion.series);
+    contribAge = depletion.depletedAge;
+  }
+
+  // Line C: contribute until a custom chosen age, then retire on the same spend pattern.
+  const stopAge = Math.max(+els.stopAge.value, currentAge);
+  els.stopAgeVal.textContent = stopAge;
+  document.getElementById('stopAgeLabel').textContent = stopAge;
+  const accumPhaseEndC = Math.min(stopAge, planEnd);
+  const accumPhaseC = accumulateSeriesWithBonus(currentPot, monthly, bonusAnnual, bonusEndAge, accRate, currentAge, accumPhaseEndC, nominal);
+  const balanceAtStop = accumPhaseC[accumPhaseC.length - 1].y;
+  let lineC = accumPhaseC;
+  let stopAgeDepleted = null;
+  if (accumPhaseEndC < planEnd) {
+    const depletionC = twoPhaseDepletion(balanceAtStop, accumPhaseEndC, decRate, RETIRE_BUMP_AGE, spend, spendAfter60, planEnd);
+    lineC = accumPhaseC.slice(0, -1).concat(depletionC.series);
+    stopAgeDepleted = depletionC.depletedAge;
+  }
+
+  const required = [];
+  for (let age = currentAge; age <= planEnd; age++) {
+    const rawRequired = requiredPotAt(age, decRate, spAge, spAmount, spend, endAge);
+    const oneYearNeed = (age >= spAge) ? Math.max(spend - spAmount, 0) : spend;
+    required.push({ x: age, y: Math.max(rawRequired, oneYearNeed, 10000) });
+  }
+
+  document.getElementById('coastAgeOut').textContent = coastAge ? ('Age ' + coastAge) : ('Lasts to ' + planEnd);
+  document.getElementById('coastSub').textContent = coastAge
+    ? 'money runs out'
+    : `never runs out by ${planEnd}`;
+  const earliestSafeAge = findEarliestSafeStopAge(
+    currentPot, monthly, bonusAnnual, bonusEndAge, accRate, decRate,
+    RETIRE_BUMP_AGE, spend, spendAfter60, currentAge, planEnd, nominal
+  );
+  document.getElementById('contribAgeOut').textContent = earliestSafeAge ? ('Age ' + earliestSafeAge) : `Not by ${planEnd}`;
+  document.getElementById('contribSub').textContent = earliestSafeAge
+    ? `contribute until then, never runs out by ${planEnd}`
+    : 'try increasing contributions or lowering spend';
+  document.getElementById('stopAgeOut').textContent = stopAgeDepleted ? ('Age ' + stopAgeDepleted) : ('Lasts to ' + planEnd);
+  document.getElementById('stopAgeSub').textContent = stopAgeDepleted
+    ? 'money runs out'
+    : `never runs out by ${planEnd}`;
+  if (earliestSafeAge) {
+    const balanceAtEarliestSafeAge = accumulateSeriesWithBonus(
+      currentPot, monthly, bonusAnnual, bonusEndAge, accRate, currentAge, earliestSafeAge, nominal
+    ).slice(-1)[0].y;
+    document.getElementById('stopAgePotLabel').textContent = `Coast FIRE number (pot at ${earliestSafeAge})`;
+    document.getElementById('stopAgePot').textContent = fmtGBP(balanceAtEarliestSafeAge);
+    document.getElementById('stopAgePotAgeSub').textContent = earliestSafeAge;
+    document.getElementById('stopAgePotPlanEnd').textContent = planEnd;
+  } else {
+    document.getElementById('stopAgePotLabel').textContent = 'Coast FIRE number';
+    document.getElementById('stopAgePot').textContent = '—';
+    document.getElementById('stopAgePotAgeSub').textContent = '—';
+    document.getElementById('stopAgePotPlanEnd').textContent = planEnd;
+  }
+
+  const text = currentTextColor(), muted = currentMutedColor();
+  const accent = currentAccent(), accentSoft = currentAccentSoft(), need = currentNeed(), stopLine = currentStopLine(), line = currentLine();
+
+  const peak = Math.max(
+    ...withContrib.map(p => p.y),
+    ...noContrib.map(p => p.y),
+    ...lineC.map(p => p.y)
+  );
+  function niceCeil(v) {
+    const exp = Math.floor(Math.log10(v));
+    const mag = Math.pow(10, exp);
+    const norm = v / mag;
+    let nice;
+    if (norm <= 1) nice = 1;
+    else if (norm <= 2) nice = 2;
+    else if (norm <= 5) nice = 5;
+    else nice = 10;
+    return nice * mag;
+  }
+  const yAxisMax = niceCeil(peak * 1.05);
+
+  const datasets = [
+    {
+      label: 'Contribute to 60, then retire',
+      data: withContrib,
+      borderColor: accent,
+      backgroundColor: accent,
+      borderWidth: 2.5,
+      pointRadius: 0,
+      tension: 0.15,
+    },
+    {
+      label: 'Stop contributing today',
+      data: noContrib,
+      borderColor: accentSoft,
+      backgroundColor: accentSoft,
+      borderWidth: 2,
+      borderDash: [2, 3],
+      pointRadius: 0,
+      tension: 0.15,
+    },
+    {
+      label: 'Pot needed (state pension model)',
+      data: required,
+      borderColor: need,
+      backgroundColor: need,
+      borderWidth: 2.5,
+      pointRadius: 0,
+      tension: 0.1,
+    },
+    {
+      label: `Stop at age ${stopAge}`,
+      data: lineC,
+      borderColor: stopLine,
+      backgroundColor: stopLine,
+      borderWidth: 2.5,
+      borderDash: [6, 3],
+      pointRadius: 0,
+      tension: 0.15,
+    },
+  ];
+
+  if (!chart) {
+    chart = new Chart(document.getElementById('chart'), {
+      type: 'line',
+      data: { datasets },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        scales: {
+          x: {
+            type: 'linear',
+            min: currentAge,
+            max: planEnd,
+            ticks: { color: muted, stepSize: 5, font: { size: 11 } },
+            grid: { color: line },
+            title: { display: true, text: 'Age', color: muted, font: { size: 11 } },
+          },
+          y: {
+            type: 'logarithmic',
+            min: 10000,
+            max: yAxisMax,
+            afterBuildTicks: (scale) => {
+              const niceValues = [];
+              let mag = Math.pow(10, Math.floor(Math.log10(scale.min) - 1e-9));
+              while (mag <= scale.max * 1.0001) {
+                [1, 2, 5].forEach(n => {
+                  const v = n * mag;
+                  if (v >= scale.min * 0.9999 && v <= scale.max * 1.0001) niceValues.push(v);
+                });
+                mag *= 10;
+              }
+              scale.ticks = niceValues.map(v => ({ value: v }));
+            },
+            ticks: {
+              color: muted,
+              font: { size: 11 },
+              callback: (v) => fmtGBPk(v),
+            },
+            grid: { color: line },
+          },
+        },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              title: (items) => 'Age ' + items[0].parsed.x,
+              label: (item) => item.dataset.label + ': ' + fmtGBP(item.parsed.y),
+            },
+          },
+          crossoverLines: {
+            lines: [
+              { age: coastAge, color: need },
+              { age: contribAge, color: accent },
+              { age: stopAgeDepleted, color: stopLine },
+            ],
+          },
+        },
+      },
+    });
+  } else {
+    chart.data.datasets = datasets;
+    chart.options.scales.x.min = currentAge;
+    chart.options.scales.x.max = planEnd;
+    chart.options.scales.y.min = 10000;
+    chart.options.scales.y.max = yAxisMax;
+    chart.options.plugins.crossoverLines.lines = [
+      { age: coastAge, color: need },
+      { age: contribAge, color: accent },
+      { age: stopAgeDepleted, color: stopLine },
+    ];
+    chart.update();
+  }
+}
+
+Object.values(els).forEach(el => {
+  if (!el || el.tagName !== 'INPUT') return;
+  el.addEventListener('input', recompute);
+});
+
+// --- Spend breakdown ---
+const expenseItems = [
+  { name: 'Mortgage Repayment', amount: 861.48, flag: 'clears in ~14 years' },
+  { name: 'Electricity', amount: 178.00 },
+  { name: 'Rates', amount: 163.04 },
+  { name: 'Groceries, Fuel, Haircut, Cleaners', amount: 860.00 },
+  { name: 'Expenditure - Anything Else', amount: 1000.00 },
+  { name: 'Buddies', amount: 150.00 },
+  { name: 'Lloyds - House Insurance', amount: 52.18 },
+  { name: 'Greensleeves', amount: 38.23 },
+  { name: 'Vodafone', amount: 33.00 },
+  { name: 'Google Devices', amount: 33.72 },
+  { name: 'Alfie Football', amount: 30.00 },
+  { name: 'Kids - Clubs', amount: 30.00 },
+  { name: 'YouTube Family', amount: 19.99 },
+  { name: 'Claude', amount: 18.99 },
+  { name: 'Netflix', amount: 18.99 },
+  { name: 'Tv Licence', amount: 15.45 },
+  { name: 'Life Insurance (Andrew)', amount: 7.66 },
+  { name: 'Smarty Ashleigh', amount: 6.00 },
+  { name: 'Smarty Andrew', amount: 6.00 },
+  { name: 'Ashleigh', amount: 51.00 },
+  { name: 'Google - Ashleigh', amount: 1.59 },
+  { name: 'Kids - Child Benefit', amount: -179.40, credit: true, flag: 'income, reduces total' },
+  { name: 'Dividend Income', amount: -71.64, credit: true, flag: 'income, reduces total — will grow with the portfolio' },
+];
+
+function renderBreakdown() {
+  const list = document.getElementById('breakdownList');
+  const sorted = [...expenseItems].sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount));
+  list.innerHTML = sorted.map(item => `
+    <li class="${item.credit ? 'credit' : ''}">
+      <span class="name">${item.name}${item.flag ? `<span class="flag">${item.flag}</span>` : ''}</span>
+      <span class="amt">${item.amount < 0 ? '-' : ''}${fmtGBP(Math.abs(item.amount))}</span>
+    </li>
+  `).join('');
+
+  const monthlyTotal = expenseItems.reduce((sum, i) => sum + i.amount, 0);
+  const annualTotal = monthlyTotal * 12;
+  const postMortgageMonthly = monthlyTotal - 861.48;
+  const postMortgageAnnual = postMortgageMonthly * 12;
+
+  document.getElementById('breakdownMonthly').textContent = fmtGBP(monthlyTotal);
+  document.getElementById('breakdownAnnual').textContent = fmtGBP(annualTotal);
+  document.getElementById('breakdownPostMortgage').textContent = fmtGBP(postMortgageAnnual);
+  document.getElementById('mortgageAge').textContent = (+els.currentAge.value) + 14;
+}
+
+document.querySelectorAll('.pill-btn').forEach(btn => {
+  if (!btn.dataset.set) return;
+  btn.addEventListener('click', () => {
+    els.spend.value = btn.dataset.set;
+    recompute();
+  });
+});
+
+// --- Reset to defaults ---
+// Captured from the markup at load, so the baseline is always whatever the
+// sliders were authored with — no second list of numbers to keep in sync.
+const defaults = {};
+Object.entries(els).forEach(([key, el]) => {
+  if (!el || el.tagName !== 'INPUT') return;
+  defaults[key] = (el.type === 'checkbox') ? el.defaultChecked : el.defaultValue;
+});
+
+const resetBtn = document.getElementById('resetBtn');
+let resetTimer;
+resetBtn.addEventListener('click', () => {
+  Object.entries(defaults).forEach(([key, val]) => {
+    const el = els[key];
+    if (el.type === 'checkbox') el.checked = val; else el.value = val;
+  });
+  recompute();
+  document.getElementById('mortgageAge').textContent = (+els.currentAge.value) + 14;
+
+  resetBtn.textContent = 'Reset ✓';
+  resetBtn.classList.add('done');
+  clearTimeout(resetTimer);
+  resetTimer = setTimeout(() => {
+    resetBtn.textContent = 'Reset to defaults';
+    resetBtn.classList.remove('done');
+  }, 1400);
+});
+
+els.currentAge.addEventListener('input', () => {
+  document.getElementById('mortgageAge').textContent = (+els.currentAge.value) + 14;
+});
+
+renderBreakdown();
+recompute();
+
+// --- Legend explanations ---
+const legendExplanations = {
+  contribute60: 'Keeps your monthly contribution (plus any bonus sacrifice) going until age 60. From 60, contributions stop and you switch to spending your planned figure from age 60 onward. This is a fixed reference scenario, always using 60 as the retirement point.',
+  stopToday: 'Assumes you stop contributing right now and retire immediately. You spend your current expenses until 60, then switch to your planned spend from 60. Shows whether the pot lasts, and if not, the age it runs dry.',
+  potNeeded: 'For every age on the chart, this asks: "if I retired at exactly this age, how big a pot would I need today?" It uses current expenses until state pension age, then a reduced amount once your combined state pension kicks in — with a floor of at least one year of spend near the plan horizon.',
+  stopChosen: 'Same idea as "contribute to 60", but lets you pick any custom age to stop contributing using the slider under "Where you are today" — so you can test earlier or later stopping points.',
+};
+
+const legendExplainEl = document.getElementById('legendExplain');
+document.querySelectorAll('.legend-item').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const key = btn.dataset.info;
+    const isActive = btn.classList.contains('active');
+    document.querySelectorAll('.legend-item').forEach(b => b.classList.remove('active'));
+    if (isActive) {
+      legendExplainEl.hidden = true;
+      legendExplainEl.textContent = '';
+    } else {
+      btn.classList.add('active');
+      legendExplainEl.textContent = legendExplanations[key];
+      legendExplainEl.hidden = false;
+    }
+  });
+});
+</script>
+</body>
+</html>
