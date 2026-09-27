@@ -32,6 +32,7 @@ Google Sheet (holdings, source of truth)
 | [`supabase_schema.sql`](supabase_schema.sql) | Tables and views. |
 | [`portfolio-dashboard/`](portfolio-dashboard/) | The React app. |
 | [`portfolio-dashboard/api/dividends.ts`](portfolio-dashboard/api/dividends.ts) | Serverless route that fills `dividend_payments`. |
+| [`portfolio-dashboard/api/prices.ts`](portfolio-dashboard/api/prices.ts) | Serverless route that fills `lse_price_cache` with a live LSE price. |
 | [`portfolio-dashboard/src/lib/dividends.ts`](portfolio-dashboard/src/lib/dividends.ts) | All dividend maths — yields, forward rate, projection, monthly buckets. |
 
 ## The data
@@ -53,6 +54,10 @@ never writes back to it. Prices are the only thing fetched live.
 - `portfolio_value_over_time` (view) — `snapshot_date` and `total_gbp_value`.
 - `dividend_payments` — one row per holding per ex-dividend date. Written by the
   `/api/dividends` serverless route, **not** by n8n. Upserted on `(ticker, ex_date)`.
+- `lse_price_cache` — one row per LSE ticker, always overwritten (a cache, not a
+  history). Written by the `/api/prices` serverless route, **not** by n8n, on a
+  Vercel cron every 6 hours. n8n's `Code: Process Data` reads it and prefers it over
+  the sheet's own `GOOGLEFINANCE`-backed price cell — see below.
 
 **`benchmark_daily`** — the S&P 500 comparison on the Overview chart reads this
 table. It's now in `supabase_schema.sql`, so a fresh project will have it, but
@@ -68,7 +73,8 @@ data until something is pointed at filling it in.
 | Finnhub | US-listed stocks. 60 calls/min free, so one call per ticker, no batching. | n8n Query Auth credential |
 | CoinGecko | BTC, ETH, XRP, SUI, SOL, priced in GBP | none |
 | Frankfurter | GBP/USD | none |
-| The sheet itself | LSE listings (VWRL, KNOS) — **Finnhub's free tier returns 403 for `.L` symbols** | — |
+| Yahoo Finance (via `lse_price_cache`) | LSE listings (VWRL, KNOS) — **Finnhub's free tier returns 403 for `.L` symbols** | none |
+| The sheet's `GOOGLEFINANCE` cell | Same, only if the cache above is empty | — |
 
 ## The Dividends tab
 
@@ -153,7 +159,12 @@ Recharts for charts, `@supabase/supabase-js` for data, deployed on Vercel.
   Supabase node sent a truncated JWT on this instance, and `apikey` alone
   authenticates as `anon`, which fails row-level security on write.
 - **The webhook is unauthenticated.** Its path is the only secret. Do not commit it.
-- **LSE holdings trust the sheet's `GBP` column.** If that value is under 0.95 of
-  `share price x share count`, the same factor is applied to `avg_cost`, so value
-  and cost basis stay on the same net-of-tax footing.
+- **LSE holdings price from `lse_price_cache` first, the sheet's `GBP` column second.**
+  The sheet's price cell is a live `GOOGLEFINANCE` formula, but it only recalculates
+  when Google's servers next touch the sheet — not guaranteed before n8n's own
+  schedule fires — so `/api/prices` fetches a Yahoo Finance quote independently and
+  n8n prefers it when present. Either way, if the sheet's `GBP` column comes out under
+  0.95 of `share price x share count`, that ratio is treated as a deliberate net-of-tax
+  haircut (KNOS's scheme shares) and the same factor is applied to `avg_cost`, so value
+  and cost basis stay on the same footing.
 - **`.env` and `.mcp.json` are gitignored.** Only `.env.example` is tracked.

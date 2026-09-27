@@ -9,17 +9,28 @@ history only; it is superseded by the import file.
 ## What it does
 
 Reads the holdings sheet, prices them (Finnhub for US stocks, CoinGecko for crypto,
-Frankfurter for GBP/USD), works out per-position and portfolio totals in GBP, and
-upserts them into Supabase (`position_snapshots` and `portfolio_daily`). It runs on a
-22-hour schedule and can also be triggered by POSTing to its webhook (this is what the
-dashboard's **Sync Now** button does).
+Frankfurter for GBP/USD, a Supabase-cached Yahoo Finance quote for LSE listings),
+works out per-position and portfolio totals in GBP, and upserts them into Supabase
+(`position_snapshots` and `portfolio_daily`). It runs on a 22-hour schedule and can
+also be triggered by POSTing to its webhook (this is what the dashboard's
+**Sync Now** button does).
 
 ```
 Schedule Trigger / Webhook -> Google Sheets -> Code: Build Symbols -> HTTP: Finnhub Quote
-  -> Code: Merge Prices -> HTTP: FX Rate -> HTTP: CoinGecko Crypto -> Code: Process Data
+  -> Code: Merge Prices -> HTTP: FX Rate -> HTTP: CoinGecko Crypto -> HTTP: LSE Price Cache
+  -> Code: Process Data
   -> HTTP: Upsert Positions
   -> Code: Daily Summary -> HTTP: Upsert Daily
 ```
+
+**`HTTP: LSE Price Cache`** reads `lse_price_cache`, a table written by the dashboard's
+own `/api/prices` serverless route (Yahoo Finance, no key) rather than by this workflow.
+It exists because the sheet's `Share Price` column for LSE tickers is a live
+`GOOGLEFINANCE` formula, but that formula only recalculates when Google's servers next
+touch the sheet — not guaranteed to happen before this workflow fires on its own
+schedule. `Code: Process Data` prefers this cache when present and falls back to the
+sheet's cell otherwise, so an empty or stale cache degrades gracefully rather than
+breaking the run. See [`portfolio-dashboard/api/prices.ts`](../portfolio-dashboard/api/prices.ts).
 
 ## After importing, fill in the placeholders
 
@@ -28,7 +39,7 @@ The export is sanitised, and the workflow is imported **inactive**.
 | Placeholder | Where | Replace with |
 |---|---|---|
 | `YOUR_GOOGLE_SHEET_ID` | Google Sheets node | ID of your holdings sheet |
-| `YOUR_PROJECT_REF` | both Upsert nodes (URL) | your Supabase project ref |
+| `YOUR_PROJECT_REF` | both Upsert nodes and `HTTP: LSE Price Cache` (URL) | your Supabase project ref |
 | `REPLACE_WITH_A_RANDOM_PATH` | Webhook node (path) | a long random string, e.g. a UUID |
 
 The webhook is unauthenticated, so keep its path secret and do not commit it.

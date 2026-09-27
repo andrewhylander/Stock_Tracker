@@ -136,7 +136,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const allRows  = $('Google Sheets').all();\nconst priceData = $('Code: Merge Prices').first().json;\nconst fxData    = $('HTTP: FX Rate').first().json;\nconst cgData    = $input.first().json;\nconst sheetRate = $('Google Sheets').first().json['ExcRate'];\nconst gbpUsd    = (sheetRate > 0) ? sheetRate : (fxData.rates?.USD || 1.27);\nconst today     = new Date().toISOString().split('T')[0];\n\n// Sheet cells carry stray trailing spaces ('Growth ' vs 'Growth'), which split\n// categories into duplicate slices downstream. Normalise every text field.\nconst clean = v => String(v ?? '').trim();\n\n// Price map from Finnhub — plain US tickers\nconst priceMap = {};\nfor (const [sym, data] of Object.entries(priceData || {})) {\n  if (data?.price) priceMap[sym] = parseFloat(data.price);\n}\n\n// CoinGecko map: ticker -> GBP price\nconst CG_IDS = { BTC:'bitcoin', ETH:'ethereum', XRP:'ripple', SUI:'sui', SOL:'solana' };\nconst cgMap  = {};\nfor (const [ticker, id] of Object.entries(CG_IDS)) {\n  if (cgData[id]) cgMap[ticker] = cgData[id].gbp;\n}\n\nconst CRYPTO = new Set(Object.keys(CG_IDS));\n\nfunction finnhubSym(ticker, currency, exchange) {\n  const t = ticker.trim().toUpperCase();\n  if (CRYPTO.has(t)) return null;\n  if (exchange === 'LON' || exchange === 'LSE' || currency === 'GBX') return null;\n  return t;\n}\n\nreturn allRows\n  .filter(r => !!clean(r.json.Ticker))\n  .map(r => {\n    const ticker     = clean(r.json.Ticker);\n    const currency   = clean(r.json.Currency) || 'GBP';\n    const exchange   = clean(r.json.Exchange);\n    const brokerage  = clean(r.json.Brokerage);\n    const shareCount = parseFloat(String(r.json['Share Count'] || '0').replace(/,/g, '')) || 0;\n    const avgCostRaw = parseFloat(String(r.json['Avg Cost']    || '0').replace(/[£$,]/g, '')) || 0;\n    const sheetGbp   = parseFloat(String(r.json['GBP']         || '0').replace(/[£$,]/g, '')) || 0;\n    const t          = ticker.toUpperCase();\n    const isCash     = t === 'CASH';\n    const isOption   = t.includes('OPTION');\n\n    let gbpPrice  = 0;\n    let gbpValue  = 0;\n    let taxFactor = 1;  // net-of-tax haircut implied by the sheet (e.g. KNOS scheme shares at 0.58)\n\n    if (isCash || isOption) {\n      gbpValue = sheetGbp;\n    } else if (CRYPTO.has(t) && cgMap[t] != null) {\n      gbpPrice = cgMap[t];\n      gbpValue = shareCount > 0 ? gbpPrice * shareCount : sheetGbp;\n    } else {\n      const sym = finnhubSym(ticker, currency, exchange);\n      const raw = sym != null ? priceMap[sym] : null;\n      if (raw != null) {\n        gbpPrice = currency === 'USD' ? raw / gbpUsd : raw;\n        gbpValue = shareCount > 0 ? gbpPrice * shareCount : sheetGbp;\n      } else {\n        // No live price — this is every LSE ticker. The sheet's GBP column is a\n        // live GOOGLEFINANCE formula that already applies any tax haircut, so\n        // trust it instead of recomputing, and reuse the implied factor below\n        // so the cost basis stays on the same net-of-tax footing.\n        const sheetPrice = parseFloat(String(r.json['Share Price'] || '0').replace(/[£$,]/g, '')) || 0;\n        if (currency === 'USD')      gbpPrice = sheetPrice / gbpUsd;\n        else if (currency === 'GBX') gbpPrice = sheetPrice / 100;\n        else                         gbpPrice = sheetPrice;\n\n        const gross = gbpPrice * shareCount;\n        if (sheetGbp > 0 && gross > 0) {\n          gbpValue = sheetGbp;\n          const implied = sheetGbp / gross;\n          // Only a clear reduction counts as a deliberate haircut; anything near\n          // 1 is rounding or a momentarily stale cell, not a tax adjustment.\n          if (implied < 0.95) taxFactor = implied;\n        } else {\n          gbpValue = gross > 0 ? gross : sheetGbp;\n        }\n      }\n    }\n\n    let avgCostGbp;\n    if (currency === 'GBX')      avgCostGbp = avgCostRaw / 100;\n    else if (currency === 'USD') avgCostGbp = avgCostRaw / gbpUsd;\n    else                         avgCostGbp = avgCostRaw;\n    avgCostGbp *= taxFactor;\n\n    const invested        = (isCash || isOption) ? 0 : avgCostGbp * shareCount;\n    const unrealisedPl    = (isCash || isOption) ? 0 : gbpValue - invested;\n    const unrealisedPlPct = (!isCash && !isOption && invested > 0) ? (unrealisedPl / invested) * 100 : 0;\n\n    return { json: {\n      snapshot_date:        today,\n      brokerage,\n      exchange,\n      ticker,\n      category:             clean(r.json.Category),\n      sector:               clean(r.json.Sector),\n      region:               clean(r.json.Region),\n      currency,\n      share_price:          gbpPrice,\n      share_count:          shareCount,\n      gbp_value:            gbpValue,\n      avg_cost:             avgCostGbp,\n      fx_rate:              gbpUsd,\n      unrealised_pl:        unrealisedPl,\n      unrealised_pl_pct:    unrealisedPlPct,\n      dividend:             parseFloat(String(r.json.Dividend           || '0').replace(/[£$,]/g, '')) || 0,\n      dividend_pct:         parseFloat(String(r.json['Dividend %']      || '0').replace(/[£$,]/g, '')) || 0,\n      dividend_return:      parseFloat(String(r.json['Dividend Return'] || '0').replace(/[£$,]/g, '')) || 0\n    }};\n  });"
+        "jsCode": "const allRows  = $('Google Sheets').all();\nconst priceData = $('Code: Merge Prices').first().json;\nconst fxData    = $('HTTP: FX Rate').first().json;\nconst cgData    = $('HTTP: CoinGecko Crypto').first().json;\nconst sheetRate = $('Google Sheets').first().json['ExcRate'];\nconst gbpUsd    = (sheetRate > 0) ? sheetRate : (fxData.rates?.USD || 1.27);\nconst today     = new Date().toISOString().split('T')[0];\n\n// Sheet cells carry stray trailing spaces ('Growth ' vs 'Growth'), which split\n// categories into duplicate slices downstream. Normalise every text field.\nconst clean = v => String(v ?? '').trim();\n\n// Price map from Finnhub — plain US tickers\nconst priceMap = {};\nfor (const [sym, data] of Object.entries(priceData || {})) {\n  if (data?.price) priceMap[sym] = parseFloat(data.price);\n}\n\n// CoinGecko map: ticker -> GBP price\nconst CG_IDS = { BTC:'bitcoin', ETH:'ethereum', XRP:'ripple', SUI:'sui', SOL:'solana' };\nconst cgMap  = {};\nfor (const [ticker, id] of Object.entries(CG_IDS)) {\n  if (cgData[id]) cgMap[ticker] = cgData[id].gbp;\n}\n\nconst CRYPTO = new Set(Object.keys(CG_IDS));\n\n// Live LSE prices from api/prices.ts (Yahoo Finance), landed in\n// lse_price_cache by the direct HTTP: LSE Price Cache branch. Preferred over\n// the sheet's own GOOGLEFINANCE-backed 'Share Price' column, which only\n// recalculates when Google's servers next touch the sheet -- not guaranteed\n// to happen before this workflow runs on schedule.\nconst lseRows = $('HTTP: LSE Price Cache').all().map(i => i.json);\n// Supabase's REST API returns a JSON array; depending on n8n's version that\n// lands as one item per row already, or as a single item wrapping the whole\n// array -- handle both rather than assume.\nconst lsePriceRows = (lseRows.length === 1 && Array.isArray(lseRows[0])) ? lseRows[0] : lseRows;\nconst lseCacheMap = {};\nfor (const row of lsePriceRows) {\n  if (row && row.ticker && row.price) lseCacheMap[row.ticker] = { price: Number(row.price), currency: clean(row.currency) || 'GBP' };\n}\n\nfunction finnhubSym(ticker, currency, exchange) {\n  const t = ticker.trim().toUpperCase();\n  if (CRYPTO.has(t)) return null;\n  if (exchange === 'LON' || exchange === 'LSE' || currency === 'GBX') return null;\n  return t;\n}\n\nreturn allRows\n  .filter(r => !!clean(r.json.Ticker))\n  .map(r => {\n    const ticker     = clean(r.json.Ticker);\n    const currency   = clean(r.json.Currency) || 'GBP';\n    const exchange   = clean(r.json.Exchange);\n    const brokerage  = clean(r.json.Brokerage);\n    const shareCount = parseFloat(String(r.json['Share Count'] || '0').replace(/,/g, '')) || 0;\n    const avgCostRaw = parseFloat(String(r.json['Avg Cost']    || '0').replace(/[£$,]/g, '')) || 0;\n    const sheetGbp   = parseFloat(String(r.json['GBP']         || '0').replace(/[£$,]/g, '')) || 0;\n    const t          = ticker.toUpperCase();\n    const isCash     = t === 'CASH';\n    const isOption   = t.includes('OPTION');\n\n    let gbpPrice  = 0;\n    let gbpValue  = 0;\n    let taxFactor = 1;  // net-of-tax haircut implied by the sheet (e.g. KNOS scheme shares at 0.58)\n\n    if (isCash || isOption) {\n      gbpValue = sheetGbp;\n    } else if (CRYPTO.has(t) && cgMap[t] != null) {\n      gbpPrice = cgMap[t];\n      gbpValue = shareCount > 0 ? gbpPrice * shareCount : sheetGbp;\n    } else {\n      const sym = finnhubSym(ticker, currency, exchange);\n      const raw = sym != null ? priceMap[sym] : null;\n      const cached = lseCacheMap[t];\n\n      if (raw != null) {\n        gbpPrice = currency === 'USD' ? raw / gbpUsd : raw;\n        gbpValue = shareCount > 0 ? gbpPrice * shareCount : sheetGbp;\n      } else if (cached != null) {\n        // Yahoo's chart API already returns LSE quotes in GBP, not GBX, so no\n        // pence conversion here regardless of what the sheet's Currency column\n        // says. The sheet's own GBP column is still consulted, purely to\n        // detect a scheme discount (KNOS-style net-of-tax holdings) -- the\n        // ratio between the sheet's value and a fresh gross figure -- but the\n        // final value itself is built from the live price, not the sheet's,\n        // so a stale sheet cell can no longer produce a stale value here.\n        gbpPrice = cached.price;\n        const gross = gbpPrice * shareCount;\n        if (sheetGbp > 0 && gross > 0) {\n          const implied = sheetGbp / gross;\n          if (implied < 0.95) taxFactor = implied;\n        }\n        gbpValue = gross * taxFactor;\n      } else {\n        // No live price and no cache entry yet -- fall back to the sheet's\n        // GOOGLEFINANCE-backed cell exactly as before.\n        const sheetPrice = parseFloat(String(r.json['Share Price'] || '0').replace(/[£$,]/g, '')) || 0;\n        if (currency === 'USD')      gbpPrice = sheetPrice / gbpUsd;\n        else if (currency === 'GBX') gbpPrice = sheetPrice / 100;\n        else                         gbpPrice = sheetPrice;\n\n        const gross = gbpPrice * shareCount;\n        if (sheetGbp > 0 && gross > 0) {\n          gbpValue = sheetGbp;\n          const implied = sheetGbp / gross;\n          // Only a clear reduction counts as a deliberate haircut; anything near\n          // 1 is rounding or a momentarily stale cell, not a tax adjustment.\n          if (implied < 0.95) taxFactor = implied;\n        } else {\n          gbpValue = gross > 0 ? gross : sheetGbp;\n        }\n      }\n    }\n\n    let avgCostGbp;\n    if (currency === 'GBX')      avgCostGbp = avgCostRaw / 100;\n    else if (currency === 'USD') avgCostGbp = avgCostRaw / gbpUsd;\n    else                         avgCostGbp = avgCostRaw;\n    avgCostGbp *= taxFactor;\n\n    const invested        = (isCash || isOption) ? 0 : avgCostGbp * shareCount;\n    const unrealisedPl    = (isCash || isOption) ? 0 : gbpValue - invested;\n    const unrealisedPlPct = (!isCash && !isOption && invested > 0) ? (unrealisedPl / invested) * 100 : 0;\n\n    return { json: {\n      snapshot_date:        today,\n      brokerage,\n      exchange,\n      ticker,\n      category:             clean(r.json.Category),\n      sector:               clean(r.json.Sector),\n      region:               clean(r.json.Region),\n      currency,\n      share_price:          gbpPrice,\n      share_count:          shareCount,\n      gbp_value:            gbpValue,\n      avg_cost:             avgCostGbp,\n      fx_rate:              gbpUsd,\n      unrealised_pl:        unrealisedPl,\n      unrealised_pl_pct:    unrealisedPlPct,\n      dividend:             parseFloat(String(r.json.Dividend           || '0').replace(/[£$,]/g, '')) || 0,\n      dividend_pct:         parseFloat(String(r.json['Dividend %']      || '0').replace(/[£$,]/g, '')) || 0,\n      dividend_return:      parseFloat(String(r.json['Dividend Return'] || '0').replace(/[£$,]/g, '')) || 0\n    }};\n  });\n"
       },
       "id": "code-process",
       "name": "Code: Process Data",
@@ -285,6 +285,38 @@
       ],
       "id": "02de8922-6cd7-4cf0-ac6a-9c8291a81915",
       "name": "Webhook"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://YOUR_PROJECT_REF.supabase.co/rest/v1/lse_price_cache?select=ticker,price,currency,fetched_at",
+        "authentication": "genericCredentialType",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {},
+        "genericAuthType": "httpCustomAuth"
+      },
+      "id": "supabase-lse-price-cache",
+      "name": "HTTP: LSE Price Cache",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1584,
+        432
+      ],
+      "credentials": {
+        "httpCustomAuth": {
+          "id": "pjhN8bkMUnHr6L41",
+          "name": "Supabase Stock Tracker (custom auth)"
+        }
+      }
     }
   ],
   "connections": {
@@ -347,7 +379,7 @@
       "main": [
         [
           {
-            "node": "Code: Process Data",
+            "node": "HTTP: LSE Price Cache",
             "type": "main",
             "index": 0
           }
@@ -397,6 +429,17 @@
         [
           {
             "node": "Google Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP: LSE Price Cache": {
+      "main": [
+        [
+          {
+            "node": "Code: Process Data",
             "type": "main",
             "index": 0
           }

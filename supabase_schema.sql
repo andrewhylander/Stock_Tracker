@@ -122,3 +122,20 @@ CREATE TABLE benchmark_daily (
 );
 
 CREATE INDEX idx_benchmark_daily_snapshot_date ON benchmark_daily (snapshot_date);
+
+-- Live LSE prices, written by the `/api/prices` serverless route, not n8n.
+--
+-- Finnhub's free tier returns 403 for `.L` symbols, so the daily snapshot has
+-- always fallen back to the Google Sheet's own price column for VWRL and
+-- KNOS -- fine for a value that rarely gets revisited, not fine for a number
+-- the dashboard shows as "today's price". `/api/prices` fetches a live price
+-- from Yahoo Finance's chart API instead and lands it here; the n8n workflow
+-- reads this table when building the daily snapshot rather than the sheet's
+-- price cell. One row per ticker, always overwritten -- this is a cache of
+-- "the latest known price", not a history.
+CREATE TABLE lse_price_cache (
+    ticker VARCHAR(16) PRIMARY KEY,
+    price DECIMAL(15,4) NOT NULL,
+    currency VARCHAR(8) NOT NULL,
+    fetched_at TIMESTAMPTZ NOT NULL
+);

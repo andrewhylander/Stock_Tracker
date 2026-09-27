@@ -3,6 +3,7 @@
     { "source": "/((?!api/).*)", "destination": "/index.html" }
   ],
   "crons": [
-    { "path": "/api/dividends", "schedule": "0 6 * * 1" }
+    { "path": "/api/dividends", "schedule": "0 6 * * 1" },
+    { "path": "/api/prices", "schedule": "0 */6 * * *" }
   ]
 }
