@@ -168,17 +168,28 @@ export default async function handler(req: any, res: any) {
   try {
     const { data: positions, error: posErr } = await supabase
       .from('latest_position_snapshots')
-      .select('ticker, exchange, category')
+      .select('ticker, exchange, dividend, dividend_pct, dividend_return')
     if (posErr) throw posErr
 
-    // Crypto, cash and options never pay a dividend; asking about them would
-    // just burn Alpha Vantage's daily quota.
-    const skip = new Set(['Cash', 'Crypto', 'Options'])
+    // Ask only about holdings the sheet already flags as paying a dividend.
+    // The sheet is the source of truth for what is held and whether it pays, so
+    // there is no reason to spend a request discovering that ASTS or TSLA does
+    // not -- and doing so exhausted Alpha Vantage's 25-a-day quota before the
+    // holdings that actually matter were reached. This also drops cash, crypto
+    // and options without needing to special-case them by category.
     const byTickerName = new Map<string, string>() // ticker -> exchange
     for (const p of positions ?? []) {
-      const ticker = String((p as any).ticker ?? '').trim()
-      if (!ticker || skip.has((p as any).category)) continue
-      if (!byTickerName.has(ticker)) byTickerName.set(ticker, String((p as any).exchange ?? '').trim())
+      const row = p as any
+      const ticker = String(row.ticker ?? '').trim()
+      if (!ticker) continue
+
+      const pays =
+        Number(row.dividend_pct) > 0 ||
+        Number(row.dividend) > 0 ||
+        Number(row.dividend_return) > 0
+      if (!pays) continue
+
+      if (!byTickerName.has(ticker)) byTickerName.set(ticker, String(row.exchange ?? '').trim())
     }
     const tickers = Array.from(byTickerName.keys())
 
@@ -210,6 +221,7 @@ export default async function handler(req: any, res: any) {
     const refreshed: string[] = []
     const failed: Array<{ ticker: string; reason: string }> = []
     let avCalls = 0
+    let avExhausted = false
 
     for (const ticker of due) {
       try {
@@ -218,6 +230,10 @@ export default async function handler(req: any, res: any) {
           payments = await fetchYahoo(ticker, usdPerGbp)
         } else {
           if (!avKey) throw new Error('ALPHAVANTAGE_API_KEY is not set')
+          // Once the key is out of requests every further call returns the same
+          // refusal, so stop asking rather than reporting one quota message per
+          // remaining ticker.
+          if (avExhausted) throw new Error('Skipped: Alpha Vantage quota already exhausted this run')
           if (avCalls > 0) await sleep(AV_MIN_INTERVAL_MS)
           avCalls++
           payments = await fetchAlphaVantage(ticker, avKey, usdPerGbp)
@@ -234,14 +250,20 @@ export default async function handler(req: any, res: any) {
         }
         refreshed.push(`${ticker} (${payments.length})`)
       } catch (e: unknown) {
-        failed.push({ ticker, reason: e instanceof Error ? e.message : String(e) })
+        const reason = e instanceof Error ? e.message : String(e)
+        if (/premium|requests per day|rate limit/i.test(reason)) avExhausted = true
+        failed.push({ ticker, reason })
       }
     }
 
     return res.status(200).json({
       refreshed,
       failed,
-      skipped: tickers.length - due.length,
+      // Named rather than counted: a bare `skipped: 0` gave no way to tell a
+      // working staleness guard from a broken one.
+      skippedAsFresh: tickers.filter(t => !due.includes(t)),
+      consideredTickers: tickers,
+      alphaVantageCalls: avCalls,
       usdPerGbp,
     })
   } catch (e: unknown) {
