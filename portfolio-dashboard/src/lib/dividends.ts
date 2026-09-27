@@ -263,10 +263,12 @@ export interface UpcomingPayment {
   ticker: string
   date: string            // pay date where known, otherwise ex-date
   estimatedDate: boolean  // the date is derived from a lag, not declared
-  amount: number          // GBP, at today's share count
+  amount: number          // GBP, at today's share count, before US withholding
   perShare: number        // GBP
   projected: boolean
   changePct: number | null  // against the same holding's previous payment
+  usWithholding: boolean  // true when this payment is declared in USD
+  netAmount: number       // amount after 15% US withholding -- equals amount when usWithholding is false
 }
 
 /**
@@ -314,14 +316,22 @@ export function upcomingPayments(
         ? Number(prior.amount_per_share_gbp || 0)
         : 0
 
+      const amount = perShare * shares
+      // p.currency is the source currency the payment was declared in, ahead
+      // of GBP conversion -- the same signal used for the table's After WHT
+      // column, just read per payment instead of aggregated per holding.
+      const usWithholding = p.currency === 'USD'
+
       out.push({
         ticker,
         date: effectiveDate(p),
         estimatedDate: isEstimatedDate(p),
-        amount: perShare * shares,
+        amount,
         perShare,
         projected: isProjected(p),
         changePct: comparable > 0 ? ((perShare - comparable) / comparable) * 100 : null,
+        usWithholding,
+        netAmount: usWithholding ? amount * (1 - US_WITHHOLDING_RATE) : amount,
       })
     }
   }

@@ -57,6 +57,11 @@ export default function UpcomingDividends({ upcoming, categoryFor }: Props) {
               <p className="text-[1.15rem] font-bold text-[var(--gold)] mt-3 leading-none">
                 {fmtGbp(u.amount)}
               </p>
+              {u.usWithholding && (
+                <p className="text-[0.68rem] text-[var(--muted)] mt-1">
+                  {fmtGbp(u.netAmount)} after 15% US WHT
+                </p>
+              )}
 
               <div className="flex items-center gap-2 mt-2 flex-wrap">
                 <span className="text-[0.68rem] text-[var(--muted)]">
