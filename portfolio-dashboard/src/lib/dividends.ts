@@ -138,14 +138,24 @@ function forwardRate(trailing: DividendPayment[]): { perPayment: number | null; 
     : { perPayment: null, annual: ttm }
 }
 
+/**
+ * The last twelve months of entitlements, by EX-DATE rather than pay date.
+ *
+ * These two dates answer different questions. The chart and the upcoming cards
+ * ask when cash moves, so they use the pay date. The annual rate asks what the
+ * holding pays, and a dividend that has gone ex is declared and owed whether or
+ * not it has settled. Windowing this on the pay date dropped VWRL's 17
+ * September distribution for the thirteen days before it paid, knocking GBP 25
+ * off the headline and putting it back again afterwards.
+ */
 function trailingFor(payments: DividendPayment[], today: Date): DividendPayment[] {
   const yearAgo = new Date(today.getFullYear() - 1, today.getMonth(), today.getDate())
   return payments
     .filter(p => {
-      const d = parseDate(effectiveDate(p))
+      const d = parseDate(p.ex_date)
       return d >= yearAgo && d <= today
     })
-    .sort((a, b) => effectiveDate(a).localeCompare(effectiveDate(b)))
+    .sort((a, b) => a.ex_date.localeCompare(b.ex_date))
 }
 
 function groupByTicker(payments: DividendPayment[]): Map<string, DividendPayment[]> {
@@ -303,7 +313,7 @@ export function buildHoldingDividends(
     const annualIncome   = perShareAnnual * h.shares
 
     const quarters = [0, 0, 0, 0]
-    for (const p of trailing) quarters[Math.floor(parseDate(effectiveDate(p)).getMonth() / 3)] += 1
+    for (const p of trailing) quarters[Math.floor(parseDate(p.ex_date).getMonth() / 3)] += 1
 
     rows.push({
       ...h,

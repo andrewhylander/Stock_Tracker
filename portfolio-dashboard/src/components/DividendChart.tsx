@@ -34,7 +34,11 @@ export default function DividendChart({ payments, holdings }: Props) {
           <p className="text-[0.65rem] font-semibold uppercase tracking-widest text-[var(--muted)]">
             Income by month
           </p>
-          <span className="text-[0.8rem] font-bold text-[var(--gold)]">{fmtGbp(total)}</span>
+          {/* Say which year this totals. It sits under a headline showing the
+              forward annual rate, and the two are different measures. */}
+          <span className="text-[0.8rem] font-bold text-[var(--gold)]">
+            {year} total {fmtGbp(total)}
+          </span>
           {projectedTotal > 0 && (
             <span className="text-[0.7rem] text-[var(--muted)]">
               incl. {fmtGbp(projectedTotal)} projected
