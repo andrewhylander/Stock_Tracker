@@ -35,18 +35,34 @@ Vite inlines `import.meta.env.VITE_*` at **build** time. Changing env vars witho
 | `VITE_N8N_URL` | n8n base URL, no trailing slash (Sync Now) |
 | `VITE_N8N_WEBHOOK_ID` | Path id after `/webhook/` |
 
+Server-side only, for `/api/dividends`. These must **not** be prefixed `VITE_`:
+
+| Variable | Purpose |
+|----------|---------|
+| `SUPABASE_URL` | Supabase project URL |
+| `SUPABASE_SERVICE_ROLE_KEY` | Service role key, used to upsert dividend rows |
+| `ALPHAVANTAGE_API_KEY` | Free key for US dividend history |
+| `DIVIDENDS_REFRESH_SECRET` | Optional. Required to use `?force=1` |
+
 If Sync fails in the browser with a network/CORS error, enable CORS on the n8n webhook or rely on the scheduled n8n run instead.
 
-## Features
+## Tabs
 
-- Portfolio value over time chart
-- Supabase integration for data fetching
-- Responsive design with Tailwind CSS
-- Sync Now trigger for the n8n snapshot workflow
+**Overview** — value over time with an S&P 500 comparison, movers, allocation, sector
+breakdown and the positions table.
+
+**Dividends** — income by month, yield and yield on cost per holding. See the root
+[README](../README.md#the-dividends-tab) for where the data comes from and why the chart
+is keyed on ex-dividend dates. Needs the `dividend_payments` table and one call to
+`/api/dividends` before it shows anything.
+
+## Routing
+
+Client-side routing via `react-router-dom`. `vercel.json` rewrites everything except
+`/api/*` to `index.html`, so deep links like `/dividends` survive a page refresh.
 
 ## Future Features
 
-- Current positions table
-- Portfolio allocation pie chart
 - Currency breakdown
 - Individual position history
+- Dividend increase / cut history per holding

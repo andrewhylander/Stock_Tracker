@@ -1,12 +1,9 @@
 import { useEffect, useState } from 'react'
+import { NavLink, Route, Routes } from 'react-router-dom'
 import { supabase } from './lib/supabase'
-import type { PortfolioDaily, Position, BenchmarkDaily } from './lib/supabase'
-import SummaryCards from './components/SummaryCards'
-import MoversStrip from './components/MoversStrip'
-import PortfolioChart from './components/PortfolioChart'
-import AllocationChart from './components/AllocationChart'
-import SectorBreakdown from './components/SectorBreakdown'
-import PositionsTable from './components/PositionsTable'
+import type { PortfolioDaily, Position, BenchmarkDaily, DividendPayment } from './lib/supabase'
+import Overview from './pages/Overview'
+import Dividends from './pages/Dividends'
 
 function missingViteEnv(names: string[]) {
   return names.filter((name) => !import.meta.env[name])
@@ -17,6 +14,8 @@ export default function App() {
   const [latest, setLatest] = useState<PortfolioDaily | null>(null)
   const [positions, setPositions] = useState<Position[]>([])
   const [benchmark, setBenchmark] = useState<BenchmarkDaily[]>([])
+  const [payments, setPayments] = useState<DividendPayment[]>([])
+  const [paymentsError, setPaymentsError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [syncing, setSyncing] = useState(false)
@@ -53,7 +52,7 @@ export default function App() {
       const msg = e instanceof Error ? e.message : 'Sync failed'
       // CORS failures often surface as TypeError: Failed to fetch even when n8n received the POST.
       setSyncMessage(
-        `${msg}. If this is a CORS error, enable CORS on the n8n webhook or call Sync from n8n’s schedule instead.`
+        `${msg}. If this is a CORS error, enable CORS on the n8n webhook or call Sync from n8n's schedule instead.`
       )
     } finally {
       setSyncing(false)
@@ -65,7 +64,7 @@ export default function App() {
       const missing = missingViteEnv(['VITE_SUPABASE_URL', 'VITE_SUPABASE_ANON_KEY'])
       if (missing.length) {
         setError(
-          `Missing ${missing.join(' and ')}. Add them in Vercel → Settings → Environment Variables, then redeploy (Vite bakes these in at build time).`
+          `Missing ${missing.join(' and ')}. Add them in Vercel -> Settings -> Environment Variables, then redeploy (Vite bakes these in at build time).`
         )
         setLoading(false)
         return
@@ -101,6 +100,26 @@ export default function App() {
       }
     }
     load()
+  }, [])
+
+  // Dividends load separately and never block the dashboard: the table may not
+  // exist yet, and the Overview tab has no use for it either way.
+  useEffect(() => {
+    async function loadDividends() {
+      if (missingViteEnv(['VITE_SUPABASE_URL', 'VITE_SUPABASE_ANON_KEY']).length) return
+      const { data, error } = await supabase
+        .from('dividend_payments')
+        .select('*')
+        .order('ex_date', { ascending: true })
+      if (error) {
+        setPaymentsError(
+          `Dividend history unavailable (${error.message}). Run the dividend_payments migration, then call /api/dividends to populate it.`
+        )
+        return
+      }
+      setPayments(data ?? [])
+    }
+    loadDividends()
   }, [])
 
   const totalValue = latest?.total_gbp_value
@@ -142,6 +161,12 @@ export default function App() {
           </div>
         </div>
 
+        {/* Tabs */}
+        <nav className="flex items-center gap-1 border-b border-[var(--border)]">
+          <Tab to="/">Overview</Tab>
+          <Tab to="/dividends">Dividends</Tab>
+        </nav>
+
         {error && (
           <div className="rounded-xl p-4 text-[0.82rem] border" style={{ background: 'rgba(242,107,107,0.08)', borderColor: 'rgba(242,107,107,0.3)', color: '#f26b6b' }}>
             {error}
@@ -161,25 +186,50 @@ export default function App() {
           </div>
         )}
 
-        {/* Summary KPI cards */}
-        <SummaryCards latest={latest} positions={positions} />
-
-        {/* Portfolio value chart */}
-        <PortfolioChart data={history} benchmark={benchmark} />
-
-        {/* Movers strip */}
-        <MoversStrip positions={positions} totalValue={totalValue} />
-
-        {/* Allocation donut + top holdings */}
-        <AllocationChart positions={positions} totalValue={totalValue} />
-
-        {/* Sector breakdown */}
-        <SectorBreakdown positions={positions} />
-
-        {/* Positions table */}
-        <PositionsTable positions={positions} totalValue={totalValue} />
+        <Routes>
+          <Route
+            path="/"
+            element={
+              <Overview
+                latest={latest}
+                history={history}
+                positions={positions}
+                benchmark={benchmark}
+                totalValue={totalValue}
+              />
+            }
+          />
+          <Route
+            path="/dividends"
+            element={
+              <Dividends
+                positions={positions}
+                payments={payments}
+                paymentsError={paymentsError}
+              />
+            }
+          />
+        </Routes>
 
       </div>
     </div>
+  )
+}
+
+function Tab({ to, children }: { to: string; children: React.ReactNode }) {
+  return (
+    <NavLink
+      to={to}
+      end={to === '/'}
+      className={({ isActive }) =>
+        `px-4 py-2.5 text-[0.82rem] font-semibold border-b-2 -mb-px transition-colors ${
+          isActive
+            ? 'border-[var(--accent)] text-[var(--text)]'
+            : 'border-transparent text-[var(--muted)] hover:text-[var(--text)]'
+        }`
+      }
+    >
+      {children}
+    </NavLink>
   )
 }

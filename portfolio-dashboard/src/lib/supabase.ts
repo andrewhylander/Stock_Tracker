@@ -47,3 +47,14 @@ export interface Position {
   dividend_pct: number
   dividend_return: number
 }
+
+export interface DividendPayment {
+  id: number
+  ticker: string
+  ex_date: string
+  amount_per_share: number
+  currency: string
+  amount_per_share_gbp: number
+  source: string
+  fetched_at: string
+}
