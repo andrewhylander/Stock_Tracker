@@ -5,9 +5,11 @@ interface Props { rows: HoldingDividend[] }
 
 export default function DividendHeader({ rows }: Props) {
   const annual    = rows.reduce((s, r) => s + r.annualIncome, 0)
+  const netAnnual = rows.reduce((s, r) => s + r.netAnnualIncome, 0)
   const value     = rows.reduce((s, r) => s + r.marketValue, 0)
   const costBasis = rows.reduce((s, r) => s + r.costBasis, 0)
-  const anyAdjusted = rows.some((r) => r.adjusted && r.annualIncome > 0)
+  const anyAdjusted     = rows.some((r) => r.adjusted && r.annualIncome > 0)
+  const anyWithholding  = rows.some((r) => r.usWithholding && r.annualIncome > 0)
 
   const yieldPct = value > 0 ? (annual / value) * 100 : 0
   const yocPct   = costBasis > 0 ? (annual / costBasis) * 100 : 0
@@ -20,6 +22,15 @@ export default function DividendHeader({ rows }: Props) {
         </p>
         <p className="text-[0.8rem] text-[var(--muted)]">Annual dividends (forward rate)</p>
       </div>
+      {/* Beside the gross headline, not replacing it -- same pattern as the
+          table's After WHT column and the Upcoming cards. The chart is the
+          one place this switches to net outright, since a bar chart has no
+          "beside" and money withheld before it reaches you isn't cash landing. */}
+      {anyWithholding && (
+        <p className="text-[0.8rem] text-[var(--text)] mt-1.5">
+          {fmtGbp(netAnnual)} <span className="text-[var(--muted)]">after 15% US WHT</span>
+        </p>
+      )}
 
       <div className="flex items-center gap-8 mt-5 flex-wrap">
         <Stat value={fmtGbp(annual / 12)} label="Monthly" />

@@ -391,7 +391,13 @@ export function buildHoldingDividends(
 
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
 
-/** Twelve buckets for one calendar year, actual and projected kept apart. */
+/**
+ * Twelve buckets for one calendar year, actual and projected kept apart.
+ *
+ * Net of US withholding, not gross. This chart answers "what lands in my
+ * account", and a bar showing money that is withheld at source before it ever
+ * reaches you answers a different, less useful question.
+ */
 export function monthlyIncome(
   payments: DividendPayment[],
   holdings: Map<string, Holding>,
@@ -406,7 +412,8 @@ export function monthlyIncome(
     if (d.getFullYear() !== year) continue
 
     const shares = holdings.get(p.ticker)?.shares ?? 0
-    const income = Number(p.amount_per_share_gbp || 0) * shares
+    const gross  = Number(p.amount_per_share_gbp || 0) * shares
+    const income = p.currency === 'USD' ? gross * (1 - US_WITHHOLDING_RATE) : gross
     if (!income) continue
 
     const b = buckets[d.getMonth()]

@@ -38,9 +38,13 @@ export default function DividendChart({ payments, holdings }: Props) {
               the header above shows the forward annual rate at today's
               declared rates, which will not match this whenever a holding's
               rate changed mid-year -- NVDA's raise alone puts these ~£9 apart.
-              Naming what each one is stops that reading as a bug. */}
+              Naming what each one is stops that reading as a bug.
+
+              Net of US withholding, unlike the header. This chart answers
+              "what lands in my account", and a bar showing money withheld
+              before it reaches you would answer a different question. */}
           <span className="text-[0.8rem] font-bold text-[var(--gold)]">
-            Cash in {year}: {fmtGbp(total)}
+            Cash in {year} (after WHT): {fmtGbp(total)}
           </span>
           {projectedTotal > 0 && (
             <span className="text-[0.7rem] text-[var(--muted)]">
@@ -99,10 +103,10 @@ export default function DividendChart({ payments, holdings }: Props) {
                   return (
                     <div style={{ background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 10, padding: '10px 14px', fontSize: 12 }}>
                       <p style={{ color: 'var(--text)', marginBottom: 8, fontWeight: 600 }}>{label} {year}</p>
-                      {d.actual > 0 && <p style={{ color: '#f5c142', marginBottom: 4 }}>Received : {fmtGbp(d.actual)}</p>}
-                      {d.projected > 0 && <p style={{ color: '#8a6d2f', marginBottom: 4 }}>Projected : {fmtGbp(d.projected)}</p>}
+                      {d.actual > 0 && <p style={{ color: '#f5c142', marginBottom: 4 }}>Received (after WHT) : {fmtGbp(d.actual)}</p>}
+                      {d.projected > 0 && <p style={{ color: '#8a6d2f', marginBottom: 4 }}>Projected (after WHT) : {fmtGbp(d.projected)}</p>}
                       <p style={{ color: 'var(--muted)', borderTop: '1px solid var(--border)', paddingTop: 6 }}>
-                        Year to date : {fmtGbp(d.cumulative)}
+                        Year to date (after WHT) : {fmtGbp(d.cumulative)}
                       </p>
                     </div>
                   )
@@ -147,7 +151,8 @@ export default function DividendChart({ payments, holdings }: Props) {
         Months are <strong className="text-[var(--text)] font-semibold">payment dates</strong> — when
         the cash lands. US holdings carry the declared date; LSE holdings derive theirs from each
         holding's published ex-to-pay gap, verified against past payments. Anything without either
-        falls back to its ex-dividend date.
+        falls back to its ex-dividend date. Bars are <strong className="text-[var(--text)] font-semibold">
+        net of 15% US withholding</strong> on USD-declared payments — VWRL and KNOS pay in GBP and are unaffected.
       </p>
     </div>
   )
