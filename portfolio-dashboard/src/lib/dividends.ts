@@ -18,13 +18,21 @@ export interface Holding {
   marketValue: number  // share_price x share_count, always gross
   costBasis: number    // gross, with any scheme adjustment reversed
   adjusted: boolean    // true where the stored value is below gross market
+  currency: string     // last non-empty currency seen for this ticker
 }
+
+// The US-UK tax treaty rate. Every dividend figure elsewhere in this file is
+// pre-withholding, matching how it is declared -- this is the one place a tax
+// rate is applied, and only ever to a holding paid in USD.
+const US_WITHHOLDING_RATE = 0.15
 
 export interface HoldingDividend extends Holding {
   perShareAnnual: number   // GBP, trailing 12 months
-  annualIncome: number     // GBP
-  yieldPct: number         // against market value
-  yieldOnCostPct: number   // against cost basis
+  annualIncome: number     // GBP, before US withholding
+  usWithholding: boolean   // true for USD-paid holdings, where 15% is withheld at source
+  netAnnualIncome: number  // annualIncome after US withholding -- equals annualIncome when usWithholding is false
+  yieldPct: number         // against market value, pre-withholding
+  yieldOnCostPct: number   // against cost basis, pre-withholding
   // Payments per quarter rather than a yes/no: KNOS pays in October and
   // November, both Q4, so a boolean collapsed two payments into one mark and
   // read as though it paid annually.
@@ -90,6 +98,7 @@ export function holdingsByTicker(positions: Position[]): Map<string, Holding> {
       marketValue: 0,
       costBasis: 0,
       adjusted: false,
+      currency: '',
     }
 
     const shares = Number(p.share_count) || 0
@@ -107,6 +116,7 @@ export function holdingsByTicker(positions: Position[]): Map<string, Holding> {
     h.marketValue += market > 0 ? market : stored
     h.costBasis   += isAdjusted ? cost / ratio : cost
     h.adjusted     = h.adjusted || isAdjusted
+    if (p.currency) h.currency = p.currency
 
     map.set(p.ticker, h)
   }
@@ -342,6 +352,13 @@ export function buildHoldingDividends(
     const perShareAnnual = forwardRate(supersedeWithDeclared(trailing, all)).annual
     const annualIncome   = perShareAnnual * h.shares
 
+    // US brokers withhold 15% at source under the UK-US tax treaty, on top of
+    // the FX conversion already folded into amount_per_share_gbp. VWRL and
+    // KNOS pay in GBP and are untouched; netAnnualIncome equals annualIncome
+    // for them, so it is safe to show for every row.
+    const usWithholding  = h.currency === 'USD'
+    const netAnnualIncome = usWithholding ? annualIncome * (1 - US_WITHHOLDING_RATE) : annualIncome
+
     const quarters = [0, 0, 0, 0]
     for (const p of trailing) quarters[Math.floor(parseDate(p.ex_date).getMonth() / 3)] += 1
 
@@ -349,6 +366,8 @@ export function buildHoldingDividends(
       ...h,
       perShareAnnual,
       annualIncome,
+      usWithholding,
+      netAnnualIncome,
       yieldPct:       h.marketValue > 0 ? (annualIncome / h.marketValue) * 100 : 0,
       yieldOnCostPct: h.costBasis > 0 ? (annualIncome / h.costBasis) * 100 : 0,
       quarters,

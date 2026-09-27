@@ -4,7 +4,7 @@ import { fmtGbp, catColor, catBg } from '../constants'
 
 interface Props { rows: HoldingDividend[] }
 
-type SortKey = 'annualIncome' | 'yieldPct' | 'yieldOnCostPct' | 'ticker'
+type SortKey = 'annualIncome' | 'netAnnualIncome' | 'yieldPct' | 'yieldOnCostPct' | 'ticker'
 
 const QUARTERS = ['Q1', 'Q2', 'Q3', 'Q4']
 
@@ -71,6 +71,7 @@ export default function DividendTable({ rows }: Props) {
                 <Th label="Yield" k="yieldPct" right />
                 <Th label="On cost" k="yieldOnCostPct" right />
                 <Th label="Annual" k="annualIncome" right />
+                <Th label="After WHT" k="netAnnualIncome" right />
               </tr>
             </thead>
             <tbody>
@@ -139,12 +140,26 @@ export default function DividendTable({ rows }: Props) {
                   <td className="px-3 py-3 text-right text-[0.82rem] font-semibold tabular-nums text-[var(--gold)]">
                     {fmtGbp(r.annualIncome)}
                   </td>
+                  <td className="px-3 py-3 text-right">
+                    <span className={`text-[0.82rem] font-semibold tabular-nums ${r.usWithholding ? 'text-[var(--text)]' : 'text-[var(--muted)]'}`}>
+                      {fmtGbp(r.netAnnualIncome)}
+                    </span>
+                    {r.usWithholding && (
+                      <span className="block text-[0.62rem] text-[var(--muted)] mt-0.5">-15% US WHT</span>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       )}
+
+      <p className="text-[0.7rem] text-[var(--muted)] px-5 pb-4 pt-3 border-t border-[var(--border)]">
+        <strong className="text-[var(--text)] font-semibold">After WHT</strong> applies the 15%
+        US withholding rate under the UK-US tax treaty to holdings paid in USD. VWRL and KNOS pay
+        in GBP and are unaffected, so their figure matches Annual.
+      </p>
     </div>
   )
 }
